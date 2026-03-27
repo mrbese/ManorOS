@@ -57,6 +57,7 @@
 		E410768710528C078F621D6F /* SharedCameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DEE81A0A124FA9099DC73A8 /* SharedCameraService.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1A1 /* Appliance.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F1 /* Appliance.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1A2 /* EnergyBill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* EnergyBill.swift */; };
+
 		F1E0D9C8B7A6F5E4D3C2B1A3 /* AuditProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* AuditProgress.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1A4 /* ApplianceClassificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F4 /* ApplianceClassificationService.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1A5 /* LightingOCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F5 /* LightingOCRService.swift */; };
@@ -115,6 +116,7 @@
 		21BB96967D104FC11029B179 /* AgeRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgeRange.swift; sourceTree = "<group>"; };
 		2A15F75FE5655F008637043A /* Room.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Room.swift; sourceTree = "<group>"; };
 		30AE5019C4C71130E3E5BB60 /* Equipment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Equipment.swift; sourceTree = "<group>"; };
+
 		30F8DD6994632A3F57276775 /* EquipmentCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentCameraView.swift; sourceTree = "<group>"; };
 		35BAC3503EE8F2E450AC6B7B /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		3F27EF9619E2DF2BFFF17585 /* RoomPlan.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = RoomPlan.framework; path = System/Library/Frameworks/RoomPlan.framework; sourceTree = SDKROOT; };
@@ -132,6 +134,7 @@
 		84F6C2237660E937555657D3 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F1 /* Appliance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appliance.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* EnergyBill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyBill.swift; sourceTree = "<group>"; };
+
 		A1B2C3D4E5F6A7B8C9D0E1F3 /* AuditProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditProgress.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F4 /* ApplianceClassificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplianceClassificationService.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F5 /* LightingOCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightingOCRService.swift; sourceTree = "<group>"; };
@@ -537,7 +540,7 @@
 			files = (
 				E4025A009CFF658CA4B4A452 /* AgeRange.swift in Sources */,
 				F1E0D9C8B7A6F5E4D3C2B1A1 /* Appliance.swift in Sources */,
-				010EA0C52F4CE8F400F3E8AD /* OnboardingCard.swift in Sources */,
+					010EA0C52F4CE8F400F3E8AD /* OnboardingCard.swift in Sources */,
 				F1E0D9C8B7A6F5E4D3C2B1A4 /* ApplianceClassificationService.swift in Sources */,
 				F1E0D9C8B7A6F5E4D3C2B1AD /* BillDetailsView.swift in Sources */,
 				010EA0D22F4CF5E700F3E8AD /* MainTabView.swift in Sources */,
@@ -559,13 +562,13 @@
 				9EA4F15A623E5A4CE66B4A7B /* DetailsView.swift in Sources */,
 				BC70286DD2F99455834484C4 /* ManorOSApp.swift in Sources */,
 				04A5AFE0F86F107C2A1B0952 /* EfficiencyDatabase.swift in Sources */,
-				F1E0D9C8B7A6F5E4D3C2B1A2 /* EnergyBill.swift in Sources */,
-				B6C2972B7391230FA46BABBC /* EnergyCalculator.swift in Sources */,
+					B6C2972B7391230FA46BABBC /* EnergyCalculator.swift in Sources */,
 				F1E0D9C8B7A6F5E4D3C2B1B2 /* EnergyProfileService.swift in Sources */,
 				010EA0D42F4D071700F3E8AD /* ManorColors.swift in Sources */,
+				F1E0D9C8B7A6F5E4D3C2B1A2 /* EnergyBill.swift in Sources */,
 				F1E0D9C8B7A6F5E4D3C2B1B1 /* EnvelopeAssessmentView.swift in Sources */,
 				25420D318A12DD96AE1E4111 /* Equipment.swift in Sources */,
-				156721E5C91380295DE2093E /* EquipmentCameraView.swift in Sources */,
+					156721E5C91380295DE2093E /* EquipmentCameraView.swift in Sources */,
 				D5B2AD3CE5AC6214154EE6C7 /* EquipmentDetailsView.swift in Sources */,
 				1B7410C404B2BB1E83BE9296 /* EquipmentResultView.swift in Sources */,
 				010EA0C32F4CE8EA00F3E8AD /* OnboardingProgressBar.swift in Sources */,
