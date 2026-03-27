@@ -18,6 +18,10 @@ struct SettingsView: View {
 
     // Onboarding
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @AppStorage("selectedHomeID") private var selectedHomeIDString: String = ""
+    @State private var showResetOnboardingAlert = false
+    @State private var showDeleteHomeAlert = false
+    @State private var showDeleteAllDataAlert = false
 
     // Home details editing state
     @State private var sqFtText: String = ""
@@ -195,6 +199,15 @@ struct SettingsView: View {
         Section("Notifications") {
             Toggle("Enable Notifications", isOn: $notificationsEnabled)
                 .tint(Color.manor.primary)
+                .onChange(of: notificationsEnabled) { _, newValue in
+                    Task {
+                        if newValue {
+                            await NotificationScheduler.scheduleMonthlyAuditReminder()
+                        } else {
+                            await NotificationScheduler.cancelAll()
+                        }
+                    }
+                }
         }
     }
 
@@ -214,26 +227,12 @@ struct SettingsView: View {
                 Text(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
                     .foregroundStyle(.secondary)
             }
-            Link(destination: URL(string: "https://manoros.com/privacy")!) {
-                HStack {
-                    Text("Privacy Policy")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Link(destination: URL(string: "https://manoros.com/terms")!) {
-                HStack {
-                    Text("Terms of Service")
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Link("Privacy Policy", destination: URL(string: "https://manoros.com/privacy")!)
+                .foregroundStyle(Color.manor.primary)
+                .accessibilityLabel("Privacy policy")
+            Link("Terms of Service", destination: URL(string: "https://manoros.com/terms")!)
+                .foregroundStyle(Color.manor.primary)
+                .accessibilityLabel("Terms of service")
         }
     }
 
@@ -241,14 +240,54 @@ struct SettingsView: View {
 
     private var dangerZoneSection: some View {
         Section {
-            Button("Reset Onboarding") {
-                hasSeenOnboarding = false
+            Button("Reset Onboarding", role: .destructive) {
+                showResetOnboardingAlert = true
             }
-            .foregroundStyle(.red)
+            .alert("Reset Onboarding?", isPresented: $showResetOnboardingAlert) {
+                Button("Reset", role: .destructive) {
+                    hasSeenOnboarding = false
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will restart the setup wizard. Your existing home data will not be deleted, but completing onboarding again will create an additional home.")
+            }
+
+            Button("Delete This Home", role: .destructive) {
+                showDeleteHomeAlert = true
+            }
+            .alert("Delete Home?", isPresented: $showDeleteHomeAlert) {
+                Button("Delete", role: .destructive) {
+                    modelContext.delete(home)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete \"\(home.name.isEmpty ? "this home" : home.name)\" and all its rooms, equipment, appliances, and bills. This cannot be undone.")
+            }
+
+            Button("Delete All Data", role: .destructive) {
+                showDeleteAllDataAlert = true
+            }
+            .alert("Delete all data?", isPresented: $showDeleteAllDataAlert) {
+                Button("Delete Everything", role: .destructive) {
+                    do {
+                        let homes = try modelContext.fetch(FetchDescriptor<Home>())
+                        homes.forEach { modelContext.delete($0) }
+                    } catch {
+                        // Best effort.
+                    }
+                    selectedHomeIDString = ""
+                    hasSeenOnboarding = false
+                    userName = ""
+                    userEmail = ""
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will delete all homes and audit data stored on this device and restart onboarding. This cannot be undone.")
+            }
         } header: {
             Text("Danger Zone")
         } footer: {
-            Text("This will show the onboarding flow again on next launch.")
+            Text("These actions cannot be undone.")
         }
     }
 }

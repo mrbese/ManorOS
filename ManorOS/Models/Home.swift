@@ -112,11 +112,20 @@ final class Home {
         return annualized.reduce(0, +) / Double(annualized.count)
     }
 
-    /// Actual electricity rate derived from bills, or default
+    /// Actual electricity rate derived from bills, then user-set rate in Settings, then app default
     var actualElectricityRate: Double {
         let rates = energyBills.map(\.computedRate).filter { $0 > 0 }
-        guard !rates.isEmpty else { return Constants.defaultElectricityRate }
-        return rates.reduce(0, +) / Double(rates.count)
+        if !rates.isEmpty {
+            return rates.reduce(0, +) / Double(rates.count)
+        }
+        let userRate = UserDefaults.standard.double(forKey: "electricityRate")
+        return userRate > 0 ? userRate : Constants.defaultElectricityRate
+    }
+
+    /// Gas rate from user Settings or app default
+    var actualGasRate: Double {
+        let userRate = UserDefaults.standard.double(forKey: "gasRate")
+        return userRate > 0 ? userRate : Constants.defaultGasRate
     }
 
     // MARK: - Audit

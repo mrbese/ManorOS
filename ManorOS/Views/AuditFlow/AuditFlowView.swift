@@ -8,7 +8,7 @@ struct AuditFlowView: View {
     @Bindable var home: Home
     var isEmbedded: Bool = false
 
-    @State private var currentStep: AuditStep = .homeBasics
+    @State private var currentStep: AuditStep = .roomScanning
     @State private var audit: AuditProgress?
 
     // Sub-view presentation states
@@ -58,10 +58,7 @@ struct AuditFlowView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .animation(.easeInOut(duration: 0.25), value: currentStep)
 
-            // Bottom buttons (hidden for envelope — it has its own Save flow)
-            if currentStep != .envelopeAssessment {
-                bottomBar
-            }
+            bottomBar
         }
         .onAppear { setupAudit() }
         // Camera sheets
@@ -181,14 +178,25 @@ struct AuditFlowView: View {
     private func setupAudit() {
         if let existing = home.currentAudit {
             audit = existing
+            migrateOldSteps(existing)
             currentStep = existing.currentStepEnum
         } else {
             let newAudit = AuditProgress(home: home)
             modelContext.insert(newAudit)
             audit = newAudit
-            currentStep = .homeBasics
+            currentStep = .roomScanning
         }
         autoCompleteCurrentStep()
+    }
+
+    private func migrateOldSteps(_ audit: AuditProgress) {
+        if AuditStep(rawValue: audit.currentStep) == nil,
+           let migrated = AuditStep.migrateRawValue(audit.currentStep) {
+            audit.currentStep = migrated
+        }
+        // Re-encode completedSteps through the getter/setter to trigger migration
+        let migrated = audit.completedSteps
+        audit.completedSteps = migrated
     }
 
     // MARK: - Step Content
@@ -196,22 +204,14 @@ struct AuditFlowView: View {
     @ViewBuilder
     private var stepContent: some View {
         switch currentStep {
-        case .homeBasics:
-            homeBasicsStep
         case .roomScanning:
             roomScanningStep
-        case .hvacEquipment:
-            hvacStep
-        case .waterHeating:
-            waterHeatingStep
-        case .applianceInventory:
-            applianceStep
-        case .lightingAudit:
-            lightingStep
-        case .windowAssessment:
-            windowStep
-        case .envelopeAssessment:
-            envelopeStep
+        case .equipment:
+            equipmentCombinedStep
+        case .appliancesAndLighting:
+            appliancesAndLightingStep
+        case .buildingEnvelope:
+            buildingEnvelopeStep
         case .billUpload:
             billStep
         case .review:
@@ -219,37 +219,7 @@ struct AuditFlowView: View {
         }
     }
 
-    // MARK: - Step 1: Home Basics
-
-    private var homeBasicsStep: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                stepHeader(
-                    icon: "house",
-                    title: "Home Basics",
-                    subtitle: "Review your home information."
-                )
-
-                VStack(spacing: 12) {
-                    infoRow(label: "Name", value: home.name.isEmpty ? "Unnamed" : home.name)
-                    if let address = home.address, !address.isEmpty {
-                        infoRow(label: "Address", value: address)
-                    }
-                    infoRow(label: "Year Built", value: home.yearBuilt)
-                    if home.computedTotalSqFt > 0 {
-                        infoRow(label: "Square Footage", value: "\(Int(home.computedTotalSqFt)) sq ft")
-                    }
-                    infoRow(label: "Climate Zone", value: home.climateZone)
-                }
-                .padding(16)
-                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
-                .shadow(color: Color.manor.background.opacity(0.04), radius: 4, y: 1)
-            }
-            .padding(20)
-        }
-    }
-
-    // MARK: - Step 2: Room Scanning
+    // MARK: - Step 1: Room Scanning
 
     private var roomScanningStep: some View {
         let completedRooms = home.rooms.filter { $0.squareFootage > 0 }
@@ -353,62 +323,74 @@ struct AuditFlowView: View {
         }
     }
 
-    // MARK: - Step 3: HVAC Equipment
+    // MARK: - Step 2: Equipment (HVAC + Water Heating combined)
 
-    private var hvacStep: some View {
-        equipmentStep(
-            icon: "snowflake",
-            title: "HVAC Equipment",
-            subtitle: "Log your heating and cooling systems — AC, heat pump, or furnace.",
-            types: hvacTypes,
-            filter: { hvacTypes.contains($0.typeEnum) }
-        )
-    }
+    private var equipmentCombinedStep: some View {
+        let hvac = home.equipment.filter { hvacTypes.contains($0.typeEnum) }
+        let water = home.equipment.filter { waterTypes.contains($0.typeEnum) }
 
-    // MARK: - Step 4: Water Heating
-
-    private var waterHeatingStep: some View {
-        equipmentStep(
-            icon: "drop.fill",
-            title: "Water Heating",
-            subtitle: "Log your water heater — tank or tankless.",
-            types: waterTypes,
-            filter: { waterTypes.contains($0.typeEnum) }
-        )
-    }
-
-    private func equipmentStep(icon: String, title: String, subtitle: String, types: [EquipmentType], filter: (Equipment) -> Bool) -> some View {
-        let matching = home.equipment.filter(filter)
         return ScrollView {
             VStack(spacing: 20) {
-                stepHeader(icon: icon, title: title, subtitle: subtitle)
+                stepHeader(
+                    icon: "wrench.and.screwdriver",
+                    title: "Equipment",
+                    subtitle: "Log your HVAC systems and water heater."
+                )
 
-                if !matching.isEmpty {
-                    completedBadge("\(matching.count) logged")
-                    ForEach(matching) { eq in
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Color.manor.success)
-                            Text(eq.typeEnum.rawValue)
-                                .font(.subheadline)
-                            Spacer()
-                            Text("\(String(format: "%.1f", eq.estimatedEfficiency)) \(eq.typeEnum.efficiencyUnit)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(12)
-                        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
+                if hvac.isEmpty && water.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "wrench.and.screwdriver")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Color.manor.primary.opacity(0.6))
+                        Text("No equipment added yet")
+                            .font(.headline)
+                        Text("Add your heating/cooling systems and water heater. Check the equipment label for model and efficiency information.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
+                } else {
+                    if !hvac.isEmpty {
+                        Text("HVAC")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        ForEach(hvac) { eq in equipmentRow(eq) }
+                    }
+                    if !water.isEmpty {
+                        Text("Water Heating")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        ForEach(water) { eq in equipmentRow(eq) }
                     }
                 }
 
-                actionButton(icon: "plus.circle.fill", label: "Add \(title)") {
-                    // Present EquipmentDetailsView with filtered types
+                actionButton(icon: "plus.circle.fill", label: "Add Equipment") {
                     showingEquipmentSheet = true
-                    pendingEquipmentTypes = types
+                    pendingEquipmentTypes = []
                 }
             }
             .padding(20)
         }
+    }
+
+    private func equipmentRow(_ eq: Equipment) -> some View {
+        HStack {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Color.manor.success)
+            Text(eq.typeEnum.rawValue)
+                .font(.subheadline)
+            Spacer()
+            Text("\(String(format: "%.1f", eq.estimatedEfficiency)) \(eq.typeEnum.efficiencyUnit)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
     }
 
     @State private var showingEquipmentSheet = false
@@ -419,31 +401,83 @@ struct AuditFlowView: View {
     @State private var scanningPlaceholderRoom: Room?
 
 
-    // MARK: - Step 5: Appliance Inventory
+    // MARK: - Step 3: Appliances & Lighting (combined)
 
-    private var applianceStep: some View {
-        ScrollView {
+    private var appliancesAndLightingStep: some View {
+        let nonLighting = home.appliances.filter { !$0.categoryEnum.isLighting }
+        let lighting = home.appliances.filter { $0.categoryEnum.isLighting }
+
+        return ScrollView {
             VStack(spacing: 20) {
                 stepHeader(
-                    icon: "tv",
-                    title: "Appliance Inventory",
-                    subtitle: "Scan or add major appliances — refrigerator, dishwasher, washer, dryer, etc."
+                    icon: "powerplug",
+                    title: "Appliances & Lighting",
+                    subtitle: "Scan or add your appliances and lighting fixtures."
                 )
 
-                let nonLighting = home.appliances.filter { !$0.categoryEnum.isLighting }
-                if !nonLighting.isEmpty {
-                    completedBadge("\(nonLighting.count) appliance\(nonLighting.count == 1 ? "" : "s")")
-                    ForEach(nonLighting) { appliance in
-                        applianceRow(appliance)
+                if nonLighting.isEmpty && lighting.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "powerplug")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Color.manor.primary.opacity(0.6))
+                        Text("No appliances or lighting added yet")
+                            .font(.headline)
+                        Text("Add your major appliances and lighting. Scan labels with the camera or enter details manually.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
+                } else {
+                    if !nonLighting.isEmpty {
+                        Text("Appliances")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        ForEach(nonLighting) { appliance in
+                            applianceRow(appliance)
+                        }
+                    }
+                    if !lighting.isEmpty {
+                        Text("Lighting")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        ForEach(lighting) { appliance in
+                            applianceRow(appliance)
+                        }
                     }
                 }
 
-                HStack(spacing: 12) {
-                    actionButton(icon: "camera.fill", label: "Scan") {
-                        showingApplianceScan = true
+                VStack(spacing: 8) {
+                    Text("Appliances")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 12) {
+                        actionButton(icon: "camera.fill", label: "Scan") {
+                            showingApplianceScan = true
+                        }
+                        actionButton(icon: "pencil", label: "Manual") {
+                            showingApplianceManual = true
+                        }
                     }
-                    actionButton(icon: "pencil", label: "Manual") {
-                        showingApplianceManual = true
+                }
+
+                VStack(spacing: 8) {
+                    Text("Lighting")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 12) {
+                        actionButton(icon: "camera.fill", label: "Scan Label") {
+                            showingLightingScan = true
+                        }
+                        actionButton(icon: "pencil", label: "Manual") {
+                            showingLightingManual = true
+                        }
                     }
                 }
             }
@@ -452,104 +486,124 @@ struct AuditFlowView: View {
     }
 
     @State private var showingApplianceManual = false
-
-    // MARK: - Step 6: Lighting Audit
-
-    private var lightingStep: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                stepHeader(
-                    icon: "lightbulb",
-                    title: "Lighting Audit",
-                    subtitle: "Scan bulb labels or add lighting fixtures to estimate energy use."
-                )
-
-                let lighting = home.appliances.filter { $0.categoryEnum.isLighting }
-                if !lighting.isEmpty {
-                    completedBadge("\(lighting.count) light\(lighting.count == 1 ? "" : "s")")
-                    ForEach(lighting) { appliance in
-                        applianceRow(appliance)
-                    }
-                }
-
-                HStack(spacing: 12) {
-                    actionButton(icon: "camera.fill", label: "Scan Label") {
-                        showingLightingScan = true
-                    }
-                    actionButton(icon: "pencil", label: "Manual") {
-                        showingLightingManual = true
-                    }
-                }
-            }
-            .padding(20)
-        }
-    }
-
     @State private var showingLightingManual = false
 
-    // MARK: - Step 7: Window Assessment
+    // MARK: - Step 4: Building Envelope (Windows + Envelope combined)
 
-    private var windowStep: some View {
+    @State private var showingEnvelopeAssessment = false
+
+    private var buildingEnvelopeStep: some View {
         ScrollView {
             VStack(spacing: 20) {
                 stepHeader(
-                    icon: "window.casement",
-                    title: "Window Assessment",
-                    subtitle: "Assess window types and condition in each room."
+                    icon: "house.and.flag",
+                    title: "Building Envelope",
+                    subtitle: "Assess windows in each room and your home's insulation and air sealing."
                 )
 
-                let roomsWithWindows = home.rooms.filter { !$0.windows.isEmpty }
-                if !roomsWithWindows.isEmpty {
-                    completedBadge("\(roomsWithWindows.count) room\(roomsWithWindows.count == 1 ? "" : "s") assessed")
+                // Windows section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Windows")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    let roomsWithWindows = home.rooms.filter { !$0.windows.isEmpty }
+                    if !roomsWithWindows.isEmpty {
+                        completedBadge("\(roomsWithWindows.count) room\(roomsWithWindows.count == 1 ? "" : "s") assessed")
+                    }
+
+                    if home.rooms.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "window.casement")
+                                .font(.system(size: 40))
+                                .foregroundStyle(Color.manor.primary.opacity(0.6))
+                            Text("No rooms added yet")
+                                .font(.headline)
+                            Text("Add rooms first (Step 1) before assessing windows.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
+                    } else {
+                        if roomsWithWindows.isEmpty {
+                            Text("Tap a room below to add window types and note any drafts.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        ForEach(home.rooms) { room in
+                            Button {
+                                windowEditRoom = room
+                            } label: {
+                                HStack {
+                                    Image(systemName: room.windows.isEmpty ? "circle" : "checkmark.circle.fill")
+                                        .foregroundStyle(room.windows.isEmpty ? Color.secondary : Color.manor.success)
+                                    Text(room.name.isEmpty ? "Unnamed Room" : room.name)
+                                        .font(.subheadline)
+                                    Spacer()
+                                    Text("\(room.windows.count) window\(room.windows.count == 1 ? "" : "s")")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(12)
+                                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
 
-                if home.rooms.isEmpty {
-                    Text("Add rooms first (Step 2) to assess windows.")
-                        .font(.subheadline)
+                // Envelope section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Envelope Assessment")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
-                } else {
-                    Text("Tap a room to edit its windows.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    ForEach(home.rooms) { room in
-                        Button {
-                            windowEditRoom = room
-                        } label: {
-                            HStack {
-                                Image(systemName: room.windows.isEmpty ? "circle" : "checkmark.circle.fill")
-                                    .foregroundStyle(room.windows.isEmpty ? Color.secondary : Color.manor.success)
-                                Text(room.name.isEmpty ? "Unnamed Room" : room.name)
-                                    .font(.subheadline)
-                                Spacer()
-                                Text("\(room.windows.count) window\(room.windows.count == 1 ? "" : "s")")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Image(systemName: "chevron.right")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(12)
-                            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
+                    if home.envelope != nil {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color.manor.success)
+                            Text("Envelope assessment complete")
+                                .font(.subheadline.bold())
+                                .foregroundStyle(Color.manor.success)
                         }
-                        .buttonStyle(.plain)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.manor.success.opacity(0.1), in: Capsule())
+                    }
+
+                    actionButton(icon: "house.and.flag", label: home.envelope != nil ? "Update Envelope" : "Assess Envelope") {
+                        showingEnvelopeAssessment = true
                     }
                 }
             }
             .padding(20)
         }
+        .sheet(isPresented: $showingEnvelopeAssessment) {
+            NavigationStack {
+                EnvelopeAssessmentView(home: home, onComplete: {
+                    showingEnvelopeAssessment = false
+                })
+                .navigationTitle("Envelope Assessment")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") { showingEnvelopeAssessment = false }
+                    }
+                }
+            }
+        }
     }
 
-    // MARK: - Step 8: Envelope Assessment
-
-    private var envelopeStep: some View {
-        EnvelopeAssessmentView(home: home, onComplete: {
-            completeCurrentStep()
-        })
-    }
-
-    // MARK: - Step 9: Bill Upload
+    // MARK: - Step 5: Bill Upload
 
     private var billStep: some View {
         ScrollView {
@@ -560,7 +614,22 @@ struct AuditFlowView: View {
                     subtitle: "Upload utility bills to calibrate energy cost estimates."
                 )
 
-                if !home.energyBills.isEmpty {
+                if home.energyBills.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Color.manor.primary.opacity(0.6))
+                        Text("No bills uploaded yet")
+                            .font(.headline)
+                        Text("Upload recent utility bills to calibrate energy cost estimates and improve accuracy. You can scan a paper bill or enter usage manually.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
+                } else {
                     completedBadge("\(home.energyBills.count) bill\(home.energyBills.count == 1 ? "" : "s") uploaded")
                     ForEach(home.energyBills) { bill in
                         HStack {
@@ -592,7 +661,7 @@ struct AuditFlowView: View {
         }
     }
 
-    // MARK: - Step 10: Review
+    // MARK: - Step 6: Review
 
     private var reviewStep: some View {
         VStack(spacing: 20) {
@@ -633,7 +702,7 @@ struct AuditFlowView: View {
                         .foregroundStyle(Color.manor.primary)
                     Text("Audit Complete!")
                         .font(.title2.bold())
-                    Text("All 10 steps finished.")
+                    Text("All steps finished.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -649,7 +718,7 @@ struct AuditFlowView: View {
 
     private var bottomBar: some View {
         HStack {
-            if currentStep != .homeBasics {
+            if currentStep != .roomScanning {
                 Button {
                     moveToPreviousStep()
                 } label: {
@@ -669,6 +738,9 @@ struct AuditFlowView: View {
             if currentStep == .review {
                 Button {
                     audit?.markComplete(.review)
+                    AnalyticsService.track(.auditCompleted, properties: [
+                        "homeName": home.name.isEmpty ? "Unnamed" : home.name
+                    ])
                     dismiss()
                 } label: {
                     Text("Finish")
@@ -716,14 +788,10 @@ struct AuditFlowView: View {
 
     private var isCurrentStepSatisfied: Bool {
         switch currentStep {
-        case .homeBasics: return true
         case .roomScanning: return home.rooms.contains { $0.squareFootage > 0 }
-        case .hvacEquipment: return home.equipment.contains { hvacTypes.contains($0.typeEnum) }
-        case .waterHeating: return home.equipment.contains { waterTypes.contains($0.typeEnum) }
-        case .applianceInventory: return home.appliances.contains { !$0.categoryEnum.isLighting }
-        case .lightingAudit: return home.appliances.contains { $0.categoryEnum.isLighting }
-        case .windowAssessment: return home.rooms.contains { !$0.windows.isEmpty }
-        case .envelopeAssessment: return home.envelope != nil
+        case .equipment: return !home.equipment.isEmpty
+        case .appliancesAndLighting: return !home.appliances.isEmpty
+        case .buildingEnvelope: return home.envelope != nil || home.rooms.contains { !$0.windows.isEmpty }
         case .billUpload: return !home.energyBills.isEmpty
         case .review: return true
         }
@@ -746,14 +814,10 @@ struct AuditFlowView: View {
 
     private func stepHasData(_ step: AuditStep) -> Bool {
         switch step {
-        case .homeBasics: return true
         case .roomScanning: return home.rooms.contains { $0.squareFootage > 0 }
-        case .hvacEquipment: return home.equipment.contains { hvacTypes.contains($0.typeEnum) }
-        case .waterHeating: return home.equipment.contains { waterTypes.contains($0.typeEnum) }
-        case .applianceInventory: return home.appliances.contains { !$0.categoryEnum.isLighting }
-        case .lightingAudit: return home.appliances.contains { $0.categoryEnum.isLighting }
-        case .windowAssessment: return home.rooms.contains { !$0.windows.isEmpty }
-        case .envelopeAssessment: return home.envelope != nil
+        case .equipment: return !home.equipment.isEmpty
+        case .appliancesAndLighting: return !home.appliances.isEmpty
+        case .buildingEnvelope: return home.envelope != nil || home.rooms.contains { !$0.windows.isEmpty }
         case .billUpload: return !home.energyBills.isEmpty
         case .review: return false
         }
@@ -762,6 +826,11 @@ struct AuditFlowView: View {
     private func completeCurrentStep() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         audit?.markComplete(currentStep)
+        if currentStep == .review {
+            AnalyticsService.track(.auditCompleted, properties: [
+                "homeName": home.name.isEmpty ? "Unnamed" : home.name
+            ])
+        }
         moveToNextStep()
     }
 

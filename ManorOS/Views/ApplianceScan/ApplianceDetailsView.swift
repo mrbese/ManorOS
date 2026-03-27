@@ -2,6 +2,11 @@ import SwiftUI
 import SwiftData
 import UIKit
 
+enum UsageMode: String, CaseIterable {
+    case daily = "Daily"
+    case weekly = "Weekly"
+}
+
 struct ApplianceDetailsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -12,6 +17,7 @@ struct ApplianceDetailsView: View {
     var prefilledWattage: Double? = nil
     var prefilledImage: UIImage? = nil
     var detectionMethod: String = "manual"
+    var existingAppliance: Appliance? = nil
     var onComplete: (() -> Void)? = nil
 
     @State private var category: ApplianceCategory = .other
@@ -22,9 +28,31 @@ struct ApplianceDetailsView: View {
     @State private var selectedRoom: Room?
     @State private var showingResult = false
     @State private var savedAppliance: Appliance?
+    @State private var hoursError: String? = nil
+    @State private var wattageError: String? = nil
+    @State private var usageMode: UsageMode = .daily
+    @State private var usesPerWeek: String = ""
+    @State private var minutesPerUse: String = ""
+
+    private var isEditing: Bool { existingAppliance != nil }
 
     private var isLightingCategory: Bool {
         [.ledBulb, .cflBulb, .incandescentBulb].contains(category)
+    }
+
+    private var isIntermittentCategory: Bool {
+        [.dishwasher, .oven, .coffeeMaker, .toaster, .microwave].contains(category)
+    }
+
+    private static let alwaysOnCategories: Set<ApplianceCategory> = [
+        .refrigerator, .freezer, .router
+    ]
+
+    private var calculatedDailyHours: Double? {
+        guard usageMode == .weekly,
+              let uses = Double(usesPerWeek), uses > 0,
+              let mins = Double(minutesPerUse), mins > 0 else { return nil }
+        return (uses * mins) / (7.0 * 60.0)
     }
 
     var body: some View {
@@ -40,7 +68,7 @@ struct ApplianceDetailsView: View {
                 previewSection
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Add Appliance")
+            .navigationTitle(isEditing ? "Edit Appliance" : "Add Appliance")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -60,10 +88,13 @@ struct ApplianceDetailsView: View {
                     }
                 }
             }
-            .onAppear { applyPrefills() }
+            .onAppear {
+                applyPrefills()
+                prefillFromExisting()
+            }
             .navigationDestination(isPresented: $showingResult) {
                 if let appliance = savedAppliance {
-                    ApplianceResultView(appliance: appliance, onComplete: onComplete ?? { dismiss() })
+                    ApplianceResultView(appliance: appliance, home: home, onComplete: onComplete ?? { dismiss() })
                 }
             }
         }
@@ -93,6 +124,8 @@ struct ApplianceDetailsView: View {
                 if hoursPerDay.isEmpty {
                     hoursPerDay = formatHours(newValue.defaultHoursPerDay)
                 }
+                let intermittent: Set<ApplianceCategory> = [.dishwasher, .oven, .coffeeMaker, .toaster, .microwave]
+                usageMode = intermittent.contains(newValue) ? .weekly : .daily
             }
 
             if let image = prefilledImage {
@@ -162,20 +195,74 @@ struct ApplianceDetailsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            if let error = wattageError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
     }
 
     private var usageSection: some View {
         Section("Usage") {
-            HStack {
-                Text("Hours per day")
-                Spacer()
-                TextField("hrs", text: $hoursPerDay)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 60)
-                Text("hrs")
-                    .foregroundStyle(.secondary)
+            if isIntermittentCategory {
+                Picker("Usage Pattern", selection: $usageMode) {
+                    ForEach(UsageMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            if usageMode == .weekly && isIntermittentCategory {
+                HStack {
+                    Text("Uses per week")
+                    Spacer()
+                    TextField("times", text: $usesPerWeek)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                }
+
+                HStack {
+                    Text("Duration per use")
+                    Spacer()
+                    TextField("min", text: $minutesPerUse)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                    Text("min")
+                        .foregroundStyle(.secondary)
+                }
+
+                if let daily = calculatedDailyHours {
+                    HStack(spacing: 4) {
+                        Image(systemName: "equal.circle")
+                            .font(.caption)
+                            .foregroundStyle(Color.manor.primary)
+                        Text(String(format: "≈ %.1f hrs/day average", daily))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                HStack {
+                    Text("Hours per day")
+                    Spacer()
+                    TextField("hrs", text: $hoursPerDay)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                    Text("hrs")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let error = hoursError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
 
             if !isLightingCategory {
@@ -202,12 +289,19 @@ struct ApplianceDetailsView: View {
         }
     }
 
+    private var effectiveHoursPerDay: Double {
+        if usageMode == .weekly && isIntermittentCategory, let daily = calculatedDailyHours {
+            return daily
+        }
+        return Double(hoursPerDay) ?? category.defaultHoursPerDay
+    }
+
     private var previewSection: some View {
         Section("Energy Preview") {
             let w = Double(wattage) ?? category.defaultWattage
-            let h = Double(hoursPerDay) ?? category.defaultHoursPerDay
+            let h = effectiveHoursPerDay
             let annualKWh = w * h * 365.0 / 1000.0 * Double(quantity)
-            let annualCost = annualKWh * Constants.defaultElectricityRate
+            let annualCost = annualKWh * home.actualElectricityRate
 
             HStack {
                 Text("Annual Energy")
@@ -251,11 +345,14 @@ struct ApplianceDetailsView: View {
     }
 
     private func applyPrefills() {
+        guard existingAppliance == nil else { return }
         if let cat = prefilledCategory {
             category = cat
             name = cat.rawValue
             wattage = String(Int(cat.defaultWattage))
             hoursPerDay = formatHours(cat.defaultHoursPerDay)
+        } else if wattage.isEmpty {
+            wattage = String(Int(category.defaultWattage))
         }
         if let w = prefilledWattage {
             wattage = String(Int(w))
@@ -263,25 +360,77 @@ struct ApplianceDetailsView: View {
         if let r = room {
             selectedRoom = r
         }
+        let intermittent: Set<ApplianceCategory> = [.dishwasher, .oven, .coffeeMaker, .toaster, .microwave]
+        usageMode = intermittent.contains(category) ? .weekly : .daily
+    }
+
+    private func prefillFromExisting() {
+        guard let appliance = existingAppliance else { return }
+        category = appliance.categoryEnum
+        name = appliance.name
+        wattage = String(Int(appliance.estimatedWattage))
+        hoursPerDay = formatHours(appliance.hoursPerDay)
+        quantity = appliance.quantity
+        if let r = appliance.room {
+            selectedRoom = r
+        }
     }
 
     private func saveAppliance() {
+        let w = Double(wattage) ?? category.defaultWattage
+        let h = effectiveHoursPerDay
+
+        var hasError = false
+        if w <= 0 {
+            wattageError = "Wattage must be greater than 0"
+            hasError = true
+        } else {
+            wattageError = nil
+        }
+        if h > 24 {
+            hoursError = "Hours per day cannot exceed 24"
+            hasError = true
+        } else if usageMode == .weekly && isIntermittentCategory && calculatedDailyHours == nil {
+            hoursError = "Enter uses per week and duration"
+            hasError = true
+        } else {
+            hoursError = nil
+        }
+        guard !hasError else { return }
+
+        let clampedH = min(h, 24.0)
+
+        if let existing = existingAppliance {
+            existing.category = category.rawValue
+            existing.name = name.isEmpty ? category.rawValue : name
+            existing.estimatedWattage = w
+            existing.hoursPerDay = clampedH
+            existing.quantity = quantity
+            home.updatedAt = Date()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onComplete?()
+            dismiss()
+            return
+        }
+
         guard savedAppliance == nil else {
             showingResult = true
             return
         }
 
-        let w = Double(wattage) ?? category.defaultWattage
-        let h = min(Double(hoursPerDay) ?? category.defaultHoursPerDay, 24.0)
+        let validPhoto: Data? = {
+            guard let img = prefilledImage, img.size.width > 1 else { return nil }
+            return img.jpegData(compressionQuality: 0.7)
+        }()
 
         let appliance = Appliance(
             category: category,
             name: name.isEmpty ? category.rawValue : name,
             estimatedWattage: w,
-            hoursPerDay: h,
+            hoursPerDay: clampedH,
             quantity: quantity,
             detectionMethod: detectionMethod,
-            photoData: prefilledImage?.jpegData(compressionQuality: 0.7)
+            photoData: validPhoto
         )
 
         appliance.home = home

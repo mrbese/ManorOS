@@ -9,13 +9,19 @@ struct HomeReportView: View {
     @State private var showingPDFShare = false
     @State private var pdfURL: URL?
     @StateObject private var stateDetector = StateDetectionService()
+    @State private var isGeneratingPDF = false
+
+    // Cached computations (refresh when `home.updatedAt` changes)
+    @State private var cachedGrade: EfficiencyGrade?
+    @State private var cachedProfile: EnergyProfile?
+    @State private var cachedUpgradesByEquipment: [(equipment: Equipment, upgrades: [UpgradeRecommendation])] = []
 
     private var grade: EfficiencyGrade {
-        GradingEngine.grade(for: home)
+        cachedGrade ?? GradingEngine.grade(for: home)
     }
 
     private var profile: EnergyProfile {
-        EnergyProfileService.generateProfile(for: home)
+        cachedProfile ?? EnergyProfileService.generateProfile(for: home)
     }
 
     private var homeRecommendations: [Recommendation] {
@@ -26,14 +32,32 @@ struct HomeReportView: View {
         home.computedTotalSqFt > 0 ? home.computedTotalSqFt : 1500
     }
 
+    private var isUsingSqFtFallback: Bool {
+        home.computedTotalSqFt <= 0
+    }
+
     // All upgrade recommendations grouped by equipment
     private var allUpgradesByEquipment: [(equipment: Equipment, upgrades: [UpgradeRecommendation])] {
-        home.equipment.compactMap { eq in
+        cachedUpgradesByEquipment
+    }
+
+    // Best-tier recommendations only (for summary stats)
+    private var bestTierRecommendations: [UpgradeRecommendation] {
+        allUpgradesByEquipment.compactMap { $0.upgrades.first(where: { $0.tier == .best }) }
+    }
+
+    private func refreshCaches() {
+        cachedGrade = GradingEngine.grade(for: home)
+        cachedProfile = EnergyProfileService.generateProfile(for: home)
+        cachedUpgradesByEquipment = home.equipment.compactMap { eq in
             let ups = UpgradeEngine.generateUpgrades(
-                for: eq, climateZone: home.climateZoneEnum, homeSqFt: sqFt
+                for: eq,
+                climateZone: home.climateZoneEnum,
+                homeSqFt: sqFt,
+                electricityRate: home.actualElectricityRate,
+                gasRate: home.actualGasRate
             )
             guard !ups.isEmpty else { return nil }
-            // Only include if at least one tier has meaningful savings
             let bestTier = ups.first(where: { $0.tier == .best })
             guard (bestTier?.annualSavings ?? 0) > 10 else { return nil }
             return (equipment: eq, upgrades: ups)
@@ -42,11 +66,6 @@ struct HomeReportView: View {
             let bPB = b.upgrades.first(where: { $0.tier == .best })?.paybackYears ?? 999
             return aPB < bPB
         }
-    }
-
-    // Best-tier recommendations only (for summary stats)
-    private var bestTierRecommendations: [UpgradeRecommendation] {
-        allUpgradesByEquipment.compactMap { $0.upgrades.first(where: { $0.tier == .best }) }
     }
 
     private var totalCurrentCost: Double {
@@ -80,6 +99,9 @@ struct HomeReportView: View {
         ScrollView {
             VStack(spacing: 20) {
                 summarySection
+                if home.equipment.isEmpty && !home.rooms.isEmpty {
+                    roomsOnlySummarySection
+                }
                 if !home.equipment.isEmpty {
                     costSection
                 }
@@ -134,7 +156,14 @@ struct HomeReportView: View {
         .navigationBarTitleDisplayMode(.large)
         .onAppear {
             gradeRevealed = true
+            refreshCaches()
             stateDetector.detectState()
+            AnalyticsService.track(.reportViewed, properties: [
+                "homeName": home.name.isEmpty ? "Unnamed" : home.name
+            ])
+        }
+        .onChange(of: home.updatedAt) { _, _ in
+            refreshCaches()
         }
         .sensoryFeedback(.success, trigger: gradeRevealed)
         .sheet(isPresented: $showingPDFShare) {
@@ -161,13 +190,23 @@ struct HomeReportView: View {
                 }
                 Spacer()
                 VStack(spacing: 2) {
-                    Text(grade.rawValue)
-                        .font(.system(size: 56, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.manor.onPrimary)
-                        .accessibilityLabel("Efficiency grade \(grade.rawValue)")
-                    Text("Grade")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
+                    if home.equipment.isEmpty {
+                        Text("N/A")
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.manor.onPrimary.opacity(0.6))
+                            .accessibilityLabel("Efficiency grade not available — add equipment to get a grade")
+                        Text("Add equipment")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.6))
+                    } else {
+                        Text(grade.rawValue)
+                            .font(.system(size: 56, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.manor.onPrimary)
+                            .accessibilityLabel("Efficiency grade \(grade.rawValue)")
+                        Text("Grade")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
                 }
             }
 
@@ -202,6 +241,17 @@ struct HomeReportView: View {
                 }
             }
 
+            if !home.equipment.isEmpty {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(gradeConfidence.color)
+                        .frame(width: 6, height: 6)
+                    Text(gradeConfidence.label)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            }
+
             Text(grade.summary)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.8))
@@ -212,12 +262,77 @@ struct HomeReportView: View {
         .background(Color.manor.primary, in: RoundedRectangle(cornerRadius: 20))
     }
 
+    private var gradeConfidence: (label: String, color: Color) {
+        var sources = 0
+        if !home.equipment.isEmpty { sources += 1 }
+        if !home.appliances.isEmpty { sources += 1 }
+        if home.envelope != nil { sources += 1 }
+
+        switch sources {
+        case 3: return ("High confidence", Color.manor.success)
+        case 2: return ("Medium confidence", Color.manor.warning)
+        case 1: return ("Low confidence", Color.manor.warning)
+        default: return ("Incomplete data", .secondary)
+        }
+    }
+
+    // MARK: - Rooms-Only Summary (shown when rooms exist but no equipment)
+
+    private var roomsOnlySummarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "square.split.2x2")
+                    .foregroundStyle(Color.manor.primary)
+                Text("Room Summary")
+                    .font(.headline)
+            }
+
+            if home.computedTotalSqFt > 0 {
+                infoRow("Total square footage", "\(Int(home.computedTotalSqFt)) sq ft")
+            }
+
+            if home.totalBTU > 0 {
+                infoRow("Total BTU load", "\(Int(home.totalBTU / 1000))k BTU")
+                infoRow("Estimated HVAC tonnage", String(format: "%.1f tons", home.totalBTU / 12000))
+            }
+
+            infoRow("Rooms scanned", "\(home.rooms.filter { $0.squareFootage > 0 }.count) of \(home.rooms.count)")
+
+            Divider()
+
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(Color.manor.primary)
+                Text("Add your HVAC equipment to see energy cost estimates and upgrade recommendations.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color.manor.background.opacity(0.06), radius: 8, y: 2)
+    }
+
     // MARK: - Cost
 
     private var costSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Energy Cost Estimate")
                 .font(.headline)
+
+            if isUsingSqFtFallback {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(Color.manor.info)
+                    Text("Estimates assume 1,500 sq ft. Scan your rooms for more accurate results.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(12)
+                .background(Color.manor.info.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+            }
 
             HStack {
                 Text("Current Annual Cost")
@@ -455,9 +570,9 @@ struct HomeReportView: View {
 
     private func tierBackgroundColor(_ tier: UpgradeTier) -> Color {
         switch tier {
-        case .good: return .blue
-        case .better: return .orange
-        case .best: return .green
+        case .good: return Color.manor.info
+        case .better: return Color.manor.accent
+        case .best: return Color.manor.success
         }
     }
 
@@ -500,11 +615,13 @@ struct HomeReportView: View {
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(categoryColor(cat.name))
                                 .frame(width: width, height: 20)
+                                .accessibilityLabel("\(cat.name): \(Int(cat.percentage)) percent, $\(Int(cat.annualCost)) per year")
                         }
                     }
                 }
                 .frame(height: 20)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                .accessibilityElement(children: .combine)
             }
 
             // Legend
@@ -526,6 +643,8 @@ struct HomeReportView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(cat.name): $\(Int(cat.annualCost)) per year, \(Int(cat.percentage)) percent of total")
             }
         }
         .padding(16)
@@ -829,6 +948,22 @@ struct HomeReportView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Link(destination: URL(string: "https://www.irs.gov/credits-deductions/energy-efficient-home-improvement-credit")!) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.caption)
+                        Text("Learn more at IRS.gov")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(Color.manor.primary)
+                }
+
+                Text("Federal tax credits available through 2032 under the Inflation Reduction Act.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(16)
         .background(.background, in: RoundedRectangle(cornerRadius: 16))
@@ -979,16 +1114,32 @@ struct HomeReportView: View {
                 .background(Color.manor.primary, in: RoundedRectangle(cornerRadius: 14))
                 .foregroundStyle(Color.manor.onPrimary)
             }
+            .accessibilityLabel("Share report as text")
 
             Button {
-                if let url = ReportPDFGenerator.savePDF(for: home) {
-                    pdfURL = url
-                    showingPDFShare = true
+                guard !isGeneratingPDF else { return }
+                isGeneratingPDF = true
+                Task {
+                    let url = await ReportPDFGenerator.savePDFAsync(for: home)
+                    await MainActor.run {
+                        isGeneratingPDF = false
+                        if let url {
+                            pdfURL = url
+                            showingPDFShare = true
+                            AnalyticsService.track(.pdfExported, properties: [
+                                "homeName": home.name.isEmpty ? "Unnamed" : home.name
+                            ])
+                        }
+                    }
                 }
             } label: {
                 HStack {
                     Image(systemName: "doc.richtext")
-                    Text("Share as PDF")
+                    if isGeneratingPDF {
+                        Text("Generating PDF…")
+                    } else {
+                        Text("Share as PDF")
+                    }
                 }
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
@@ -996,6 +1147,8 @@ struct HomeReportView: View {
                 .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
                 .foregroundStyle(.primary)
             }
+            .accessibilityLabel("Export PDF report")
+            .disabled(isGeneratingPDF)
         }
     }
 

@@ -62,6 +62,12 @@ struct BillDetailsView: View {
                         Text("/kWh")
                             .foregroundStyle(.secondary)
                     }
+
+                    if (Double(totalKWhText) ?? 0) <= 0 && (Double(totalCostText) ?? 0) <= 0 {
+                        Text("Enter at least kWh usage or total cost")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                 }
 
                 if let kwh = Double(totalKWhText), let cost = Double(totalCostText), kwh > 0 {
@@ -106,7 +112,7 @@ struct BillDetailsView: View {
                     }
                     .bold()
                     .disabled(
-                        (Double(totalKWhText) == nil && Double(totalCostText) == nil) ||
+                        (Double(totalKWhText) ?? 0) <= 0 && (Double(totalCostText) ?? 0) <= 0 ||
                         billingStart >= billingEnd
                     )
                 }
@@ -148,6 +154,7 @@ struct BillDetailsView: View {
         bill.home = home
         modelContext.insert(bill)
         home.updatedAt = Date()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         onComplete?()
         dismiss()
     }

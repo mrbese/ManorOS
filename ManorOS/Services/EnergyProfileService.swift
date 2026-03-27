@@ -47,7 +47,7 @@ enum EnergyProfileService {
 
     static func generateProfile(for home: Home) -> EnergyProfile {
         let rate = home.actualElectricityRate
-        let gasRate = Constants.defaultGasRate
+        let gasRate = home.actualGasRate
         let sqFt = home.computedTotalSqFt > 0 ? home.computedTotalSqFt : 1500
 
         // --- Equipment costs grouped by category ---
@@ -208,7 +208,9 @@ enum EnergyProfileService {
         let atticScore = insulationScore(env.atticInsulation)
         total += atticScore
         details.append("Attic: \(env.atticInsulation.rawValue)")
-        if weakest == nil || atticScore < weakest!.1 { weakest = ("Attic Insulation", atticScore) }
+        if weakest == nil || atticScore < (weakest?.1 ?? .greatestFiniteMagnitude) {
+            weakest = ("Attic Insulation", atticScore)
+        }
 
         let wallScore = insulationScore(env.wallInsulation)
         total += wallScore

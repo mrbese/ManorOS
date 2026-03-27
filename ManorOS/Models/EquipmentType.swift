@@ -31,7 +31,8 @@ enum EquipmentType: String, Codable, CaseIterable, Identifiable {
 
     var efficiencyUnit: String {
         switch self {
-        case .centralAC, .windowUnit: return "SEER"
+        case .centralAC: return "SEER"
+        case .windowUnit: return "EER"
         case .heatPump: return "SEER"
         case .furnace: return "% AFUE"
         case .waterHeater, .waterHeaterTankless: return "UEF"

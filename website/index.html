@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ManorOS — Intelligence lives here.</title>
+  <meta name="description" content="Open-source iOS home energy assessment tool. Scan rooms with LiDAR, photograph equipment for OCR efficiency analysis, get prioritized upgrade recommendations with payback periods.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="container">
+    <a href="#" class="logo">
+      <span></span> ManorOS
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#methodology">Methodology</a>
+      <a href="https://github.com/MrBese/ThermalScan" target="_blank">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero container">
+      <div class="hero-content">
+        <h1 class="animate">Intelligence <br><span class="glow-text">lives here.</span></h1>
+        <p class="lead animate" style="transition-delay: 0.1s;">Turn your iPhone into a residential energy auditor. Scan rooms with LiDAR, extract equipment info via OCR, and get prioritized efficiency upgrades.</p>
+        <div class="hero-actions animate" style="transition-delay: 0.2s;">
+          <a href="https://github.com/MrBese/ThermalScan" class="btn btn-primary">Download on GitHub</a>
+          <a href="#features" class="btn btn-secondary">See Features</a>
+        </div>
+      </div>
+      <div class="hero-visual animate" style="transition-delay: 0.4s;">
+        <div class="device-mockup">
+          <div class="device-screen">
+            <div class="device-header">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+            </div>
+            <div class="device-grade">A</div>
+            <div class="device-chart">
+              <div class="chart-bar"></div>
+              <div class="chart-bar"></div>
+              <div class="chart-bar"></div>
+              <div class="chart-bar"></div>
+            </div>
+            <div class="device-item" style="opacity: 0.8"></div>
+            <div class="device-item" style="opacity: 0.6"></div>
+            <div class="device-item" style="opacity: 0.4"></div>
+            <div class="device-item" style="opacity: 0.2"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="features container">
+      <span class="section-tag animate">Core Features</span>
+      <h2 class="animate">Residential energy audits,<br>democratized.</h2>
+      
+      <div class="features-grid">
+        <div class="feature-card animate">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><path d="M22 6l-10 7L2 6"></path></svg>
+          </div>
+          <h3>LiDAR Room Scanning</h3>
+          <p>Apple RoomPlan API detects floor area and dimensions instantly. Configure windows, ceiling height, and insulation quality with an elegant UI.</p>
+        </div>
+
+        <div class="feature-card animate" style="transition-delay: 0.1s;">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          </div>
+          <h3>Equipment OCR</h3>
+          <p>Photograph equipment rating plates. On-device Apple Vision extracts model numbers and efficiency ratings locally, keeping your data private.</p>
+        </div>
+
+        <div class="feature-card animate" style="transition-delay: 0.2s;">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <h3>Home Energy Report</h3>
+          <p>Receive an overall efficiency grade with prioritized upgrades sorted by payback period. Based on ACCA Manual J and ASHRAE standards.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="methodology" class="thesis">
+      <div class="container thesis-grid">
+        <div class="thesis-content">
+          <span class="section-tag animate text-accent">The Methodology</span>
+          <h2 class="animate">The Battery Synergy Thesis</h2>
+          <p class="animate">An inefficient building envelope directly cannibalizes the value of home battery systems. A poorly insulated home draws 5-6 kW on a summer afternoon, leaving a battery inverter exporting barely half its rated output during peak grid events when electricity prices spike.</p>
+          <p class="animate mt-4">ManorOS quantifies this: for each home, it calculates how much additional battery export capacity passive efficiency upgrades would unlock. Translate passive efficiency into active grid revenue.</p>
+        </div>
+        <div class="thesis-stats animate">
+          <div class="stat-item">
+            <div class="stat-value">1.5–2 kW</div>
+            <div class="text-secondary">Additional export capacity unlocked by upgrading attic insulation to R-49 and sealing ducts.</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">30–40%</div>
+            <div class="text-secondary">More grid revenue with zero additional battery hardware cost.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="logo justify-center" style="justify-content: center; margin-bottom: 1rem;">
+        <span></span> ManorOS
+      </div>
+      <p>Built for the modern, grid-aware home.</p>
+      <div class="footer-links">
+        <a href="https://github.com/MrBese/ThermalScan">GitHub Repository</a>
+        <a href="https://manoros.com">manoros.com</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+      </div>
+      <p style="font-size: 0.875rem;">© 2026 ManorOS. Open-sourced under MIT License.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -47,6 +47,11 @@ struct AuditProgressBar: View {
     private func stepCircle(step: AuditStep, index: Int) -> some View {
         let isComplete = auditProgress.isStepComplete(step)
         let isCurrent = step == currentStep
+        let stateLabel: String = {
+            if isCurrent { return "current" }
+            if isComplete { return "completed" }
+            return "not completed"
+        }()
 
         return ZStack {
             Circle()
@@ -67,5 +72,7 @@ struct AuditProgressBar: View {
                     .foregroundStyle(isCurrent ? Color.manor.onPrimary : .secondary)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(index + 1): \(step.rawValue), \(stateLabel)")
     }
 }

@@ -18,6 +18,21 @@ struct HomeDashboardView: View {
     @State private var showingBillDetailsPrefill: (ParsedBillResult, UIImage)?
     @State private var showingAuditFlow = false
 
+    // Delete confirmation state
+    @State private var roomToDelete: Room?
+    @State private var equipmentToDelete: Equipment?
+    @State private var applianceToDelete: Appliance?
+    @State private var billToDelete: EnergyBill?
+
+    // Edit state
+    @State private var editingRoom: Room?
+    @State private var editingEquipment: Equipment?
+    @State private var editingAppliance: Appliance?
+
+    private var isAuditComplete: Bool {
+        home.currentAudit?.isComplete ?? false
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -136,6 +151,77 @@ struct HomeDashboardView: View {
         .sheet(isPresented: $showingAuditFlow) {
             AuditFlowView(home: home)
         }
+        .sheet(item: $editingRoom) { room in
+            DetailsView(squareFootage: nil, home: home, existingRoom: room, onComplete: {
+                editingRoom = nil
+            })
+        }
+        .sheet(item: $editingEquipment) { item in
+            EquipmentDetailsView(home: home, existingEquipment: item, onComplete: {
+                editingEquipment = nil
+            })
+        }
+        .sheet(item: $editingAppliance) { appliance in
+            ApplianceDetailsView(home: home, existingAppliance: appliance, onComplete: {
+                editingAppliance = nil
+            })
+        }
+        .confirmationDialog(
+            "Delete Room",
+            isPresented: Binding(get: { roomToDelete != nil }, set: { if !$0 { roomToDelete = nil } }),
+            presenting: roomToDelete
+        ) { room in
+            Button("Delete \"\(room.name.isEmpty ? "Unnamed Room" : room.name)\"", role: .destructive) {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                home.updatedAt = Date()
+                modelContext.delete(room)
+                roomToDelete = nil
+            }
+        } message: { _ in
+            Text("This will permanently delete this room and its data.")
+        }
+        .confirmationDialog(
+            "Delete Equipment",
+            isPresented: Binding(get: { equipmentToDelete != nil }, set: { if !$0 { equipmentToDelete = nil } }),
+            presenting: equipmentToDelete
+        ) { item in
+            Button("Delete \"\(item.typeEnum.rawValue)\"", role: .destructive) {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                home.updatedAt = Date()
+                modelContext.delete(item)
+                equipmentToDelete = nil
+            }
+        } message: { _ in
+            Text("This will permanently delete this equipment and its data.")
+        }
+        .confirmationDialog(
+            "Delete Appliance",
+            isPresented: Binding(get: { applianceToDelete != nil }, set: { if !$0 { applianceToDelete = nil } }),
+            presenting: applianceToDelete
+        ) { appliance in
+            Button("Delete \"\(appliance.name)\"", role: .destructive) {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                home.updatedAt = Date()
+                modelContext.delete(appliance)
+                applianceToDelete = nil
+            }
+        } message: { _ in
+            Text("This will permanently delete this appliance and its data.")
+        }
+        .confirmationDialog(
+            "Delete Bill",
+            isPresented: Binding(get: { billToDelete != nil }, set: { if !$0 { billToDelete = nil } }),
+            presenting: billToDelete
+        ) { bill in
+            Button("Delete \"\(bill.utilityName ?? "Utility Bill")\"", role: .destructive) {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                home.updatedAt = Date()
+                modelContext.delete(bill)
+                billToDelete = nil
+            }
+        } message: { _ in
+            Text("This will permanently delete this bill and its data.")
+        }
     }
 
     // Additional state for camera→details flow
@@ -159,7 +245,7 @@ struct HomeDashboardView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Audit Complete")
                                 .font(.subheadline.bold())
-                            Text("All 10 steps finished")
+                            Text("All steps finished")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -187,6 +273,7 @@ struct HomeDashboardView: View {
                                 Text("\(Int(audit.progressPercentage))%")
                                     .font(.caption2.bold().monospacedDigit())
                             }
+                            .accessibilityLabel("Audit progress: \(Int(audit.progressPercentage)) percent complete")
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Continue Audit")
                                     .font(.subheadline.bold())
@@ -203,6 +290,7 @@ struct HomeDashboardView: View {
                         .background(Color.manor.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Continue audit, \(Int(audit.progressPercentage)) percent complete, step \(audit.currentStepEnum.stepNumber): \(audit.currentStepEnum.rawValue)")
                 }
             } else {
                 // No audit yet — start CTA
@@ -214,7 +302,7 @@ struct HomeDashboardView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Start Full Audit")
                                 .font(.subheadline.bold())
-                            Text("10-step guided energy assessment")
+                            Text("Guided energy assessment")
                                 .font(.caption)
                                 .opacity(0.8)
                         }
@@ -289,20 +377,22 @@ struct HomeDashboardView: View {
                 Text("Rooms")
                     .font(.headline)
                 Spacer()
-                Menu {
-                    if RoomCaptureService.isLiDARAvailable {
-                        Button(action: { showingScan = true }) {
-                            Label("Scan Room (LiDAR)", systemImage: "camera.viewfinder")
+                if isAuditComplete {
+                    Menu {
+                        if RoomCaptureService.isLiDARAvailable {
+                            Button(action: { showingScan = true }) {
+                                Label("Scan Room (LiDAR)", systemImage: "camera.viewfinder")
+                            }
                         }
+                        Button(action: { showingManualRoom = true }) {
+                            Label("Enter Manually", systemImage: "pencil")
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.manor.primary)
                     }
-                    Button(action: { showingManualRoom = true }) {
-                        Label("Enter Manually", systemImage: "pencil")
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Color.manor.primary)
+                    .accessibilityLabel("Add room")
                 }
-                .accessibilityLabel("Add room")
             }
 
             if home.rooms.isEmpty {
@@ -311,40 +401,56 @@ struct HomeDashboardView: View {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             } else {
-                ForEach(home.rooms) { room in
-                    if room.squareFootage > 0 {
-                        // Completed room — navigate to results
-                        NavigationLink {
-                            ResultsView(room: room)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(room.name.isEmpty ? "Unnamed Room" : room.name)
-                                        .font(.subheadline.bold())
-                                    Text("\(Int(room.squareFootage)) sq ft")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text("\(Int(room.calculatedBTU).formatted()) BTU")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(Color.manor.primary)
-                            }
-                            .padding(12)
-                            .background(.background, in: RoundedRectangle(cornerRadius: 10))
-                            .shadow(color: Color.manor.background.opacity(0.08), radius: 4, y: 1)
+                    let completedRooms = home.rooms.filter { $0.squareFootage > 0 }
+                    let placeholderRooms = home.rooms.filter { $0.squareFootage == 0 }
+
+                    if !placeholderRooms.isEmpty {
+                        HStack(spacing: 8) {
+                            Text("\(completedRooms.count) of \(home.rooms.count) rooms set up")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                            Spacer()
                         }
-                        .buttonStyle(.plain)
-                        .contextMenu {
+                    }
+
+                    ForEach(home.rooms) { room in
+                        if room.squareFootage > 0 {
+                            // Completed room — navigate to results
+                            NavigationLink {
+                                ResultsView(room: room)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(room.name.isEmpty ? "Unnamed Room" : room.name)
+                                            .font(.subheadline.bold())
+                                        Text("\(Int(room.squareFootage)) sq ft")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text("\(Int(room.calculatedBTU).formatted()) BTU")
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(Color.manor.primary)
+                                }
+                                .padding(12)
+                                .background(.background, in: RoundedRectangle(cornerRadius: 10))
+                                .shadow(color: Color.manor.background.opacity(0.08), radius: 4, y: 1)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(room.name.isEmpty ? "Unnamed Room" : room.name), \(Int(room.squareFootage)) square feet, \(Int(room.calculatedBTU)) BTU")
+                            .contextMenu {
+                            Button {
+                                editingRoom = room
+                            } label: {
+                                Label("Edit Details", systemImage: "pencil")
+                            }
                             Button(role: .destructive) {
-                                home.updatedAt = Date()
-                                modelContext.delete(room)
+                                roomToDelete = room
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
                     } else {
-                        // Placeholder room — tap to fill in details
                         Button {
                             editingPlaceholderRoom = room
                         } label: {
@@ -353,17 +459,17 @@ struct HomeDashboardView: View {
                                     Text(room.name.isEmpty ? "Unnamed Room" : room.name)
                                         .font(.subheadline.bold())
                                     HStack(spacing: 4) {
-                                        Image(systemName: "exclamationmark.circle")
+                                        Image(systemName: "arrow.right.circle")
                                             .font(.caption2)
-                                        Text("Tap to scan or add details")
+                                        Text("Ready to set up")
                                     }
                                     .font(.caption)
-                                    .foregroundStyle(Color.manor.warning)
+                                    .foregroundStyle(Color.manor.primary)
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.manor.primary)
                             }
                             .padding(12)
                             .background(.background, in: RoundedRectangle(cornerRadius: 10))
@@ -392,11 +498,13 @@ struct HomeDashboardView: View {
                 Text("Equipment")
                     .font(.headline)
                 Spacer()
-                Button(action: { showingEquipmentScan = true }) {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Color.manor.primary)
+                if isAuditComplete {
+                    Button(action: { showingEquipmentScan = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.manor.primary)
+                    }
+                    .accessibilityLabel("Add equipment")
                 }
-                .accessibilityLabel("Add equipment")
             }
 
             if home.equipment.isEmpty {
@@ -436,10 +544,15 @@ struct HomeDashboardView: View {
                         .shadow(color: Color.manor.background.opacity(0.08), radius: 4, y: 1)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(item.typeEnum.rawValue), efficiency \(String(format: "%.1f", item.estimatedEfficiency)) \(item.typeEnum.efficiencyUnit)")
                     .contextMenu {
+                        Button {
+                            editingEquipment = item
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
                         Button(role: .destructive) {
-                            home.updatedAt = Date()
-                            modelContext.delete(item)
+                            equipmentToDelete = item
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -457,21 +570,23 @@ struct HomeDashboardView: View {
                 Text("Appliances")
                     .font(.headline)
                 Spacer()
-                Menu {
-                    Button(action: { showingApplianceScan = true }) {
-                        Label("Scan with Camera", systemImage: "camera.fill")
+                if isAuditComplete {
+                    Menu {
+                        Button(action: { showingApplianceScan = true }) {
+                            Label("Scan with Camera", systemImage: "camera.fill")
+                        }
+                        Button(action: { showingLightingScan = true }) {
+                            Label("Scan Bulb Label", systemImage: "lightbulb")
+                        }
+                        Button(action: { showingApplianceManual = true }) {
+                            Label("Enter Manually", systemImage: "pencil")
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.manor.primary)
                     }
-                    Button(action: { showingLightingScan = true }) {
-                        Label("Scan Bulb Label", systemImage: "lightbulb")
-                    }
-                    Button(action: { showingApplianceManual = true }) {
-                        Label("Enter Manually", systemImage: "pencil")
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Color.manor.primary)
+                    .accessibilityLabel("Add appliance")
                 }
-                .accessibilityLabel("Add appliance")
             }
 
             if home.appliances.isEmpty {
@@ -516,7 +631,7 @@ struct HomeDashboardView: View {
 
                 ForEach(home.appliances) { appliance in
                     NavigationLink {
-                        ApplianceResultView(appliance: appliance)
+                        ApplianceResultView(appliance: appliance, home: home)
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: appliance.categoryEnum.icon)
@@ -548,9 +663,13 @@ struct HomeDashboardView: View {
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
+                        Button {
+                            editingAppliance = appliance
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
                         Button(role: .destructive) {
-                            home.updatedAt = Date()
-                            modelContext.delete(appliance)
+                            applianceToDelete = appliance
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -568,18 +687,20 @@ struct HomeDashboardView: View {
                 Text("Energy Bills")
                     .font(.headline)
                 Spacer()
-                Menu {
-                    Button(action: { showingBillScan = true }) {
-                        Label("Scan Bill", systemImage: "camera.fill")
+                if isAuditComplete {
+                    Menu {
+                        Button(action: { showingBillScan = true }) {
+                            Label("Scan Bill", systemImage: "camera.fill")
+                        }
+                        Button(action: { showingBillManual = true }) {
+                            Label("Enter Manually", systemImage: "pencil")
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.manor.primary)
                     }
-                    Button(action: { showingBillManual = true }) {
-                        Label("Enter Manually", systemImage: "pencil")
-                    }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Color.manor.primary)
+                    .accessibilityLabel("Add energy bill")
                 }
-                .accessibilityLabel("Add energy bill")
             }
 
             if home.energyBills.isEmpty {
@@ -660,8 +781,7 @@ struct HomeDashboardView: View {
                     .buttonStyle(.plain)
                     .contextMenu {
                         Button(role: .destructive) {
-                            home.updatedAt = Date()
-                            modelContext.delete(bill)
+                            billToDelete = bill
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }

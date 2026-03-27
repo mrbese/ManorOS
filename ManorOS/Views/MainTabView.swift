@@ -2,15 +2,20 @@ import SwiftUI
 import SwiftData
 
 enum AppTab: Int, Hashable {
-    case home, audit, report, settings
+    case home, report, settings
 }
 
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Home.updatedAt, order: .reverse) private var homes: [Home]
     @State private var selectedTab: AppTab = .home
-    @State private var selectedHomeID: UUID?
+    @AppStorage("selectedHomeID") private var selectedHomeIDString: String = ""
     @State private var showingAddHome = false
+
+    private var selectedHomeID: UUID? {
+        get { UUID(uuidString: selectedHomeIDString) }
+        nonmutating set { selectedHomeIDString = newValue?.uuidString ?? "" }
+    }
 
     private var activeHome: Home? {
         if let id = selectedHomeID, let match = homes.first(where: { $0.id == id }) {
@@ -52,14 +57,6 @@ struct MainTabView: View {
                     Label("Home", systemImage: "house.fill")
                 }
                 .tag(AppTab.home)
-
-                NavigationStack {
-                    AuditFlowView(home: home, isEmbedded: true)
-                }
-                .tabItem {
-                    Label("Audit", systemImage: "checklist")
-                }
-                .tag(AppTab.audit)
 
                 NavigationStack {
                     ReportTabView(home: home)

@@ -2,8 +2,13 @@ import SwiftUI
 
 struct ApplianceResultView: View {
     let appliance: Appliance
+    var home: Home? = nil
     var onComplete: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+
+    private var electricityRate: Double {
+        home?.actualElectricityRate ?? Constants.defaultElectricityRate
+    }
 
     var body: some View {
         ScrollView {
@@ -101,13 +106,13 @@ struct ApplianceResultView: View {
                 Text("Annual Cost")
                     .font(.subheadline)
                 Spacer()
-                Text("$\(Int(appliance.annualCost()))/yr")
+                Text("$\(Int(appliance.annualCost(rate: electricityRate)))/yr")
                     .font(.title3.bold().monospacedDigit())
                     .foregroundStyle(Color.manor.primary)
             }
 
             // Monthly breakdown
-            let monthlyCost = appliance.annualCost() / 12.0
+            let monthlyCost = appliance.annualCost(rate: electricityRate) / 12.0
             HStack {
                 Text("Monthly Cost")
                     .font(.caption)
@@ -160,7 +165,7 @@ struct ApplianceResultView: View {
                 Text("Annual Standby Cost")
                     .font(.subheadline)
                 Spacer()
-                let phantomCost = appliance.phantomAnnualKWh * Constants.defaultElectricityRate
+                let phantomCost = appliance.phantomAnnualKWh * electricityRate
                 Text("$\(String(format: "%.0f", phantomCost))/yr")
                     .font(.subheadline.bold())
                     .foregroundStyle(Color.manor.warning)
@@ -231,9 +236,9 @@ struct ApplianceResultView: View {
     private func upgradeTip(for category: ApplianceCategory) -> UpgradeTip? {
         switch category {
         case .incandescentBulb:
-            let ledWatts = appliance.estimatedWattage * 0.15 // LED uses ~15% of incandescent
+            let ledWatts = appliance.estimatedWattage * 0.15
             let savedKWh = (appliance.estimatedWattage - ledWatts) * appliance.hoursPerDay * 365 / 1000 * Double(appliance.quantity)
-            let savedCost = savedKWh * Constants.defaultElectricityRate
+            let savedCost = savedKWh * electricityRate
             return UpgradeTip(
                 title: "Switch to LED",
                 detail: "Replace this \(Int(appliance.estimatedWattage))W incandescent with a \(Int(ledWatts))W LED bulb for the same brightness.",
@@ -243,7 +248,7 @@ struct ApplianceResultView: View {
         case .cflBulb:
             let ledWatts = appliance.estimatedWattage * 0.7
             let savedKWh = (appliance.estimatedWattage - ledWatts) * appliance.hoursPerDay * 365 / 1000 * Double(appliance.quantity)
-            let savedCost = savedKWh * Constants.defaultElectricityRate
+            let savedCost = savedKWh * electricityRate
             return UpgradeTip(
                 title: "Upgrade to LED",
                 detail: "LEDs use 30% less energy than CFLs, turn on instantly, and contain no mercury.",
@@ -276,7 +281,7 @@ struct ApplianceResultView: View {
 
         default:
             if category.isPhantomLoadRelevant && category.phantomWatts > 3 {
-                let stripSavings = appliance.phantomAnnualKWh * 0.75 * Constants.defaultElectricityRate
+                let stripSavings = appliance.phantomAnnualKWh * 0.75 * electricityRate
                 return UpgradeTip(
                     title: "Smart Power Strip",
                     detail: "Use a smart power strip to cut standby power when devices are off.",

@@ -183,7 +183,7 @@ enum WindowCondition: String, CaseIterable, Codable, Identifiable {
 
 struct WindowInfo: Codable, Identifiable {
     var id: UUID = UUID()
-    var direction: CardinalDirection = .south
+    var direction: CardinalDirection = .east
     var size: WindowSize = .medium
     var paneType: PaneType = .double
     var frameMaterial: FrameMaterial = .vinyl

@@ -105,10 +105,32 @@ struct ResultsView: View {
                         .foregroundStyle(.white.opacity(0.75))
                 }
             }
+
+            Text(btuTranslation(tonnage: breakdown.tonnage))
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.75))
+                .multilineTextAlignment(.center)
+                .padding(.top, 4)
         }
         .padding(24)
         .frame(maxWidth: .infinity)
         .background(Color.manor.primary, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func btuTranslation(tonnage: Double) -> String {
+        if tonnage < 0.5 {
+            return "A small portable AC unit would handle this room"
+        } else if tonnage <= 1.0 {
+            return "Equivalent to one mini-split or a 12,000 BTU window unit"
+        } else if tonnage <= 2.0 {
+            return "Needs a 1.5-2 ton central AC zone or two mini-splits"
+        } else if tonnage <= 3.0 {
+            return "Requires a 2.5-3 ton central AC system"
+        } else if tonnage <= 5.0 {
+            return "Requires a 4-5 ton central AC system"
+        } else {
+            return "Very high load — may need multiple HVAC zones"
+        }
     }
 
     // MARK: - Breakdown

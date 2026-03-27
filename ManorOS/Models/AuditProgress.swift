@@ -2,14 +2,10 @@ import Foundation
 import SwiftData
 
 enum AuditStep: String, CaseIterable, Codable, Identifiable {
-    case homeBasics = "Home Basics"
     case roomScanning = "Room Scanning"
-    case hvacEquipment = "HVAC Equipment"
-    case waterHeating = "Water Heating"
-    case applianceInventory = "Appliance Inventory"
-    case lightingAudit = "Lighting Audit"
-    case windowAssessment = "Window Assessment"
-    case envelopeAssessment = "Envelope Assessment"
+    case equipment = "Equipment"
+    case appliancesAndLighting = "Appliances & Lighting"
+    case buildingEnvelope = "Building Envelope"
     case billUpload = "Bill Upload"
     case review = "Review"
 
@@ -21,14 +17,10 @@ enum AuditStep: String, CaseIterable, Codable, Identifiable {
 
     var icon: String {
         switch self {
-        case .homeBasics: return "house"
         case .roomScanning: return "camera.viewfinder"
-        case .hvacEquipment: return "snowflake"
-        case .waterHeating: return "drop.fill"
-        case .applianceInventory: return "tv"
-        case .lightingAudit: return "lightbulb"
-        case .windowAssessment: return "window.casement"
-        case .envelopeAssessment: return "house.and.flag"
+        case .equipment: return "wrench.and.screwdriver"
+        case .appliancesAndLighting: return "powerplug"
+        case .buildingEnvelope: return "house.and.flag"
         case .billUpload: return "doc.text"
         case .review: return "checkmark.seal"
         }
@@ -36,16 +28,32 @@ enum AuditStep: String, CaseIterable, Codable, Identifiable {
 
     var shortLabel: String {
         switch self {
-        case .homeBasics: return "Basics"
         case .roomScanning: return "Rooms"
-        case .hvacEquipment: return "HVAC"
-        case .waterHeating: return "Water"
-        case .applianceInventory: return "Appliances"
-        case .lightingAudit: return "Lighting"
-        case .windowAssessment: return "Windows"
-        case .envelopeAssessment: return "Envelope"
+        case .equipment: return "Equipment"
+        case .appliancesAndLighting: return "Appliances"
+        case .buildingEnvelope: return "Envelope"
         case .billUpload: return "Bills"
         case .review: return "Review"
+        }
+    }
+
+    /// Maps old 10-step rawValues to new 6-step rawValues for migration.
+    static func migrateRawValue(_ oldRaw: String) -> String? {
+        switch oldRaw {
+        case "Home Basics", "Room Scanning":
+            return AuditStep.roomScanning.rawValue
+        case "HVAC Equipment", "Water Heating":
+            return AuditStep.equipment.rawValue
+        case "Appliance Inventory", "Lighting Audit":
+            return AuditStep.appliancesAndLighting.rawValue
+        case "Window Assessment", "Envelope Assessment":
+            return AuditStep.buildingEnvelope.rawValue
+        case "Bill Upload":
+            return AuditStep.billUpload.rawValue
+        case "Review":
+            return AuditStep.review.rawValue
+        default:
+            return AuditStep(rawValue: oldRaw)?.rawValue
         }
     }
 }
@@ -62,7 +70,7 @@ final class AuditProgress {
     init(home: Home? = nil) {
         self.id = UUID()
         self.completedStepsData = try? JSONEncoder().encode([String]())
-        self.currentStep = AuditStep.homeBasics.rawValue
+        self.currentStep = AuditStep.roomScanning.rawValue
         self.home = home
         self.startedAt = Date()
         self.lastUpdatedAt = Date()
@@ -72,7 +80,16 @@ final class AuditProgress {
         get {
             guard let data = completedStepsData,
                   let rawValues = try? JSONDecoder().decode([String].self, from: data) else { return [] }
-            return rawValues.compactMap { AuditStep(rawValue: $0) }
+            var seen = Set<AuditStep>()
+            var result = [AuditStep]()
+            for raw in rawValues {
+                let mapped = AuditStep.migrateRawValue(raw) ?? raw
+                if let step = AuditStep(rawValue: mapped), !seen.contains(step) {
+                    seen.insert(step)
+                    result.append(step)
+                }
+            }
+            return result
         }
         set {
             completedStepsData = try? JSONEncoder().encode(newValue.map(\.rawValue))
@@ -81,7 +98,14 @@ final class AuditProgress {
     }
 
     var currentStepEnum: AuditStep {
-        AuditStep(rawValue: currentStep) ?? .homeBasics
+        if let step = AuditStep(rawValue: currentStep) {
+            return step
+        }
+        if let migrated = AuditStep.migrateRawValue(currentStep),
+           let step = AuditStep(rawValue: migrated) {
+            return step
+        }
+        return .roomScanning
     }
 
     func isStepComplete(_ step: AuditStep) -> Bool {

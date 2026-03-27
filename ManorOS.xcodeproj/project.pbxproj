@@ -33,15 +33,18 @@
 		4DB3AB8042C542DD4A7EAC28 /* OCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BC58B6DD0C83F19466EB9FD /* OCRService.swift */; };
 		4FCF91EACA591894E8C36675 /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00EE759848310E03ACCDB403 /* ResultsView.swift */; };
 		58C8B2E2FE6104B7C63B88C0 /* InsulationQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520DF73321E9D780A539CF4B /* InsulationQuality.swift */; };
+		58F63F1CB17D2CF74D942931 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4469C244FFF1DA7E50B11AD2 /* AnalyticsService.swift */; };
 		5EE8AF2DDBC5A79DD042D53F /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AD6CBD24C7158E374A454127 /* AVFoundation.framework */; };
 		7606CC1749010B46B99D17D4 /* HomeListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABFABD0FB529862C9C7E126 /* HomeListView.swift */; };
 		7718D4B8B6303B27BDF9E79E /* RoomCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0CDC592D83F169C46EAF5C7 /* RoomCaptureService.swift */; };
+		7B156B6BBB6B1C23A4F27AEA /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D881424CA20D00B3C7C5F0D3 /* NotificationScheduler.swift */; };
 		7F588EDE8442B68CCB873A04 /* RoomPlan.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F27EF9619E2DF2BFFF17585 /* RoomPlan.framework */; };
 		806A2B92D3FB7F6A23ECD2A8 /* Home.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD61FAFE81596B14157980E /* Home.swift */; };
 		904FD64E559C097CAB49D67F /* Room.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A15F75FE5655F008637043A /* Room.swift */; };
 		9EA4F15A623E5A4CE66B4A7B /* DetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0D4D9EF29AFFD1BEB92696 /* DetailsView.swift */; };
 		A433AA767373BCE30539FB59 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84F6C2237660E937555657D3 /* HomeDashboardView.swift */; };
 		A67A5054EB4F62DF376ADB7E /* ScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F7657B7D1F469D8F6554C1 /* ScanView.swift */; };
+		AB08F7FD657AB1C31CA7A50B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 18F6FAA00C813BA6E3F66E7E /* Foundation.framework */; };
 		B6C2972B7391230FA46BABBC /* EnergyCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC37822444A610D43545C929 /* EnergyCalculator.swift */; };
 		BB5FCD64E44E997499226530 /* RecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC24A901CAE93DBBD54D9BE /* RecommendationEngine.swift */; };
 		BC70286DD2F99455834484C4 /* ManorOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D74D185C82E3261299F39B /* ManorOSApp.swift */; };
@@ -51,6 +54,7 @@
 		D5B2AD3CE5AC6214154EE6C7 /* EquipmentDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8D9F7CE2C912DF24DD3A32 /* EquipmentDetailsView.swift */; };
 		DFF277B11EF1FB497592C961 /* ARKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8B738961A1AB423390AF30F /* ARKit.framework */; };
 		E4025A009CFF658CA4B4A452 /* AgeRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21BB96967D104FC11029B179 /* AgeRange.swift */; };
+		E410768710528C078F621D6F /* SharedCameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DEE81A0A124FA9099DC73A8 /* SharedCameraService.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1A1 /* Appliance.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F1 /* Appliance.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1A2 /* EnergyBill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* EnergyBill.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1A3 /* AuditProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F3 /* AuditProgress.swift */; };
@@ -75,7 +79,18 @@
 		F1E0D9C8B7A6F5E4D3C2B1B6 /* RebateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2F8 /* RebateService.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1B7 /* SchemaVersioning.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E3F1 /* SchemaVersioning.swift */; };
 		F1E0D9C8B7A6F5E4D3C2B1B8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E4F1 /* PrivacyInfo.xcprivacy */; };
+		FAF05110B536F8517050D6B6 /* ManorOSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBC9F3AA5676083F4C82F263 /* ManorOSTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A17FD27C38CA4E3C86DA4BBC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 74A2B51B7A2431C45FE8B34D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 16ACC8420320434AAE78BFDB;
+			remoteInfo = ManorOS;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		00EE759848310E03ACCDB403 /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
@@ -94,6 +109,7 @@
 		0860CF48A2239E1C9C8CED4B /* WindowInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowInfo.swift; sourceTree = "<group>"; };
 		0B8D9F7CE2C912DF24DD3A32 /* EquipmentDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentDetailsView.swift; sourceTree = "<group>"; };
 		0BC58B6DD0C83F19466EB9FD /* OCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRService.swift; sourceTree = "<group>"; };
+		18F6FAA00C813BA6E3F66E7E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		1E3068B911A82DE30DB15358 /* EfficiencyDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EfficiencyDatabase.swift; sourceTree = "<group>"; };
 		20D74D185C82E3261299F39B /* ManorOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManorOSApp.swift; sourceTree = "<group>"; };
 		21BB96967D104FC11029B179 /* AgeRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgeRange.swift; sourceTree = "<group>"; };
@@ -102,7 +118,9 @@
 		30F8DD6994632A3F57276775 /* EquipmentCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentCameraView.swift; sourceTree = "<group>"; };
 		35BAC3503EE8F2E450AC6B7B /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		3F27EF9619E2DF2BFFF17585 /* RoomPlan.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = RoomPlan.framework; path = System/Library/Frameworks/RoomPlan.framework; sourceTree = SDKROOT; };
+		4469C244FFF1DA7E50B11AD2 /* AnalyticsService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		4BC24A901CAE93DBBD54D9BE /* RecommendationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationEngine.swift; sourceTree = "<group>"; };
+		4DEE81A0A124FA9099DC73A8 /* SharedCameraService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedCameraService.swift; sourceTree = "<group>"; };
 		520DF73321E9D780A539CF4B /* InsulationQuality.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsulationQuality.swift; sourceTree = "<group>"; };
 		534162E70EEFA36E4F41B432 /* ReportPDFGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportPDFGenerator.swift; sourceTree = "<group>"; };
 		538574DE069F0F57C00DF2B7 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
@@ -144,10 +162,13 @@
 		B5ABD272ED616F79E16A552D /* ClimateZone.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClimateZone.swift; sourceTree = "<group>"; };
 		CC37822444A610D43545C929 /* EnergyCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyCalculator.swift; sourceTree = "<group>"; };
 		D0A5D09C34D23C47AD06855B /* EquipmentResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentResultView.swift; sourceTree = "<group>"; };
+		D881424CA20D00B3C7C5F0D3 /* NotificationScheduler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		D8B738961A1AB423390AF30F /* ARKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ARKit.framework; path = System/Library/Frameworks/ARKit.framework; sourceTree = SDKROOT; };
 		EAD61FAFE81596B14157980E /* Home.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Home.swift; sourceTree = "<group>"; };
+		EBC9F3AA5676083F4C82F263 /* ManorOSTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ManorOSTests.swift; sourceTree = "<group>"; };
 		F870A1B38BC0971364A338D5 /* ManorOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ManorOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F98B99473DE65D4EEFE74CA5 /* Vision.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Vision.framework; path = System/Library/Frameworks/Vision.framework; sourceTree = SDKROOT; };
+		F9F1731A6854602CD7F9F852 /* ManorOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ManorOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -161,6 +182,14 @@
 				31F874A16E83C471B5C8C185 /* PDFKit.framework in Frameworks */,
 				7F588EDE8442B68CCB873A04 /* RoomPlan.framework in Frameworks */,
 				049CE24D97483D4021270191 /* Vision.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6C1975944253AF313891E00C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB08F7FD657AB1C31CA7A50B /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -208,6 +237,7 @@
 			isa = PBXGroup;
 			children = (
 				F870A1B38BC0971364A338D5 /* ManorOS.app */,
+				F9F1731A6854602CD7F9F852 /* ManorOSTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -243,6 +273,7 @@
 				D8BD5DD42310CB1693158D7B /* Frameworks */,
 				30772F61AC9BDC8631745269 /* Products */,
 				592EA9A3BB6C038BFDBE7B68 /* ManorOS */,
+				AF7B9353B9774BD46CBDE94E /* ManorOSTests */,
 			);
 			path = ManorOS;
 			sourceTree = "<group>";
@@ -267,6 +298,9 @@
 				010EA0BF2F4C1E3900F3E8AD /* AddressSearchService.swift */,
 				010EA0C62F4CE8FD00F3E8AD /* AppleSignInCoordinator.swift */,
 				010EA0C82F4CE90200F3E8AD /* NotificationPermissionService.swift */,
+				4DEE81A0A124FA9099DC73A8 /* SharedCameraService.swift */,
+				4469C244FFF1DA7E50B11AD2 /* AnalyticsService.swift */,
+				D881424CA20D00B3C7C5F0D3 /* NotificationScheduler.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -299,6 +333,14 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		AF7B9353B9774BD46CBDE94E /* ManorOSTests */ = {
+			isa = PBXGroup;
+			children = (
+				EBC9F3AA5676083F4C82F263 /* ManorOSTests.swift */,
+			);
+			path = ManorOSTests;
+			sourceTree = "<group>";
+		};
 		C9E04F99D8E7C9D4D391AEF8 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -326,8 +368,17 @@
 				5C9FAE300761909DEB55B8B0 /* PDFKit.framework */,
 				3F27EF9619E2DF2BFFF17585 /* RoomPlan.framework */,
 				F98B99473DE65D4EEFE74CA5 /* Vision.framework */,
+				F0AD27D681094ECB0F5CA6CB /* iOS */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		F0AD27D681094ECB0F5CA6CB /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				18F6FAA00C813BA6E3F66E7E /* Foundation.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 		G1A2B3C4D5E6F7A8B9C0D1E1 /* WindowAssessment */ = {
@@ -400,6 +451,24 @@
 			productReference = F870A1B38BC0971364A338D5 /* ManorOS.app */;
 			productType = "com.apple.product-type.application";
 		};
+		269A97E36E840EEA6EB2D6EE /* ManorOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4623947CAB775BFFE1B0B128 /* Build configuration list for PBXNativeTarget "ManorOSTests" */;
+			buildPhases = (
+				1397FD03AB982E101F565FC5 /* Sources */,
+				6C1975944253AF313891E00C /* Frameworks */,
+				A1DA99021167BA6853D92C25 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				EBF05E487530280B5BB77182 /* PBXTargetDependency */,
+			);
+			name = ManorOSTests;
+			productName = ManorOSTests;
+			productReference = F9F1731A6854602CD7F9F852 /* ManorOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -429,6 +498,7 @@
 			projectRoot = "";
 			targets = (
 				16ACC8420320434AAE78BFDB /* ManorOS */,
+				269A97E36E840EEA6EB2D6EE /* ManorOSTests */,
 			);
 		};
 /* End PBXProject section */
@@ -443,9 +513,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1DA99021167BA6853D92C25 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1397FD03AB982E101F565FC5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FAF05110B536F8517050D6B6 /* ManorOSTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E7209FB05162B7572F88D05E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -510,18 +595,48 @@
 				F1E0D9C8B7A6F5E4D3C2B1B4 /* RebateDatabase.swift in Sources */,
 				F1E0D9C8B7A6F5E4D3C2B1B5 /* StateDetectionService.swift in Sources */,
 				F1E0D9C8B7A6F5E4D3C2B1B6 /* RebateService.swift in Sources */,
+				E410768710528C078F621D6F /* SharedCameraService.swift in Sources */,
+				58F63F1CB17D2CF74D942931 /* AnalyticsService.swift in Sources */,
+				7B156B6BBB6B1C23A4F27AEA /* NotificationScheduler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		EBF05E487530280B5BB77182 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ManorOS;
+			target = 16ACC8420320434AAE78BFDB /* ManorOS */;
+			targetProxy = A17FD27C38CA4E3C86DA4BBC /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		22FA6D6775F1C169D9B20AC1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.manoros.ManorOSTests;
+				PRODUCT_NAME = ManorOSTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ManorOS.app/ManorOS";
+				WRAPPER_EXTENSION = xctest;
+				WRAPPER_NAME = "$(PRODUCT_NAME).xctest";
+			};
+			name = Debug;
+		};
 		4DC7B479A29173674AFD7BAC /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = ManorOS/ManorOS.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3V7T9UPYM9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -550,6 +665,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = ManorOS/ManorOS.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3V7T9UPYM9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -571,6 +687,24 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
+		};
+		A7B9F2B15C10E66BFABF0346 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.manoros.ManorOSTests;
+				PRODUCT_NAME = ManorOSTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ManorOS.app/ManorOS";
+				VALIDATE_PRODUCT = YES;
+				WRAPPER_EXTENSION = xctest;
+				WRAPPER_NAME = "$(PRODUCT_NAME).xctest";
+			};
+			name = Release;
 		};
 		B74382A4D110BEFC1DEB55E4 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -690,6 +824,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		4623947CAB775BFFE1B0B128 /* Build configuration list for PBXNativeTarget "ManorOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A7B9F2B15C10E66BFABF0346 /* Release */,
+				22FA6D6775F1C169D9B20AC1 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		9D908D8792E5642B2623649E /* Build configuration list for PBXProject "ManorOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

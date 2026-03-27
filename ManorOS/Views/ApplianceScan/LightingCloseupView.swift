@@ -1,22 +1,22 @@
 import SwiftUI
-@preconcurrency import AVFoundation
 import UIKit
 
 struct LightingCloseupView: View {
     let onResult: (BulbOCRResult, UIImage) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @StateObject private var camera = BulbCameraService()
+    @StateObject private var camera = SharedCameraService()
     @State private var capturedImage: UIImage?
     @State private var ocrResult: BulbOCRResult?
     @State private var isProcessing = false
     @State private var showQuickSelect = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showCameraError = false
 
     var body: some View {
         ZStack {
-            BulbCameraPreview(session: camera.session)
+            SharedCameraPreview(session: camera.session)
                 .ignoresSafeArea()
 
             VStack {
@@ -69,9 +69,10 @@ struct LightingCloseupView: View {
 
                         Spacer()
 
-                        Button("Skip") {
+                        Button("Choose Manually") {
                             showQuickSelect = true
                         }
+                        .font(.caption)
                         .foregroundStyle(.white.opacity(0.8))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
@@ -82,10 +83,26 @@ struct LightingCloseupView: View {
         }
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
+        .onChange(of: camera.cameraUnavailable) { _, unavailable in
+            if unavailable {
+                showCameraError = true
+            }
+        }
         .alert("Capture Error", isPresented: $showError) {
-            Button("OK") {}
+            Button("OK") { dismiss() }
         } message: {
             Text(errorMessage)
+        }
+        .alert("Camera Unavailable", isPresented: $showCameraError) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                dismiss()
+            }
+            Button("Cancel") { dismiss() }
+        } message: {
+            Text("Camera access is required. Please enable it in Settings, or enter details manually.")
         }
         .sheet(isPresented: $showQuickSelect) {
             QuickWattageSelectView { wattage, bulbType in
@@ -94,7 +111,8 @@ struct LightingCloseupView: View {
                     bulbType: bulbType,
                     rawText: "Manual selection"
                 )
-                onResult(result, UIImage())
+                let placeholder = Self.makeTransparentPlaceholder()
+                onResult(result, placeholder)
                 dismiss()
             }
         }
@@ -173,6 +191,10 @@ struct LightingCloseupView: View {
         .padding(20)
         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 20))
         .padding(.horizontal, 20)
+    }
+
+    private static func makeTransparentPlaceholder() -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1)).image { _ in }
     }
 
     private func captureAndOCR() {
@@ -265,63 +287,3 @@ private struct QuickWattageSelectView: View {
     }
 }
 
-// MARK: - Camera (same pattern)
-
-@MainActor
-private class BulbCameraService: NSObject, ObservableObject {
-    let session = AVCaptureSession()
-    private let output = AVCapturePhotoOutput()
-    private var completion: ((UIImage?) -> Void)?
-
-    func start() {
-        guard !session.isRunning else { return }
-        session.sessionPreset = .photo
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
-        if session.canAddInput(input) { session.addInput(input) }
-        if session.canAddOutput(output) { session.addOutput(output) }
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.startRunning()
-        }
-    }
-
-    func stop() {
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.stopRunning()
-        }
-    }
-
-    func capturePhoto(completion: @escaping (UIImage?) -> Void) {
-        self.completion = completion
-        output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
-    }
-}
-
-extension BulbCameraService: AVCapturePhotoCaptureDelegate {
-    nonisolated func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else {
-            Task { @MainActor in self.completion?(nil) }
-            return
-        }
-        Task { @MainActor in self.completion?(image) }
-    }
-}
-
-private struct BulbCameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        let layer = AVCaptureVideoPreviewLayer(session: session)
-        layer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(layer)
-        return view
-    }
-    func updateUIView(_ uiView: UIView, context: Context) {
-        if let layer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            layer.frame = uiView.bounds
-        }
-    }
-}

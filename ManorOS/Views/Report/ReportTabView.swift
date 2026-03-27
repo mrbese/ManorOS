@@ -4,7 +4,7 @@ struct ReportTabView: View {
     let home: Home
 
     var body: some View {
-        if home.rooms.isEmpty && home.equipment.isEmpty {
+        if home.rooms.isEmpty && home.equipment.isEmpty && home.appliances.isEmpty {
             emptyState
                 .navigationTitle("Report")
         } else {
@@ -21,7 +21,7 @@ struct ReportTabView: View {
             VStack(spacing: 8) {
                 Text("No Report Yet")
                     .font(.title2.bold())
-                Text("Add rooms and equipment from the Home tab to generate your energy report.")
+                Text("Add rooms from the Home tab to generate your energy report. Equipment and appliances unlock cost estimates and upgrade recommendations.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

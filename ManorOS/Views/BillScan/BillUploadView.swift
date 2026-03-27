@@ -1,5 +1,4 @@
 import SwiftUI
-@preconcurrency import AVFoundation
 import PhotosUI
 import UIKit
 
@@ -8,17 +7,18 @@ struct BillUploadView: View {
     let onManual: () -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @StateObject private var camera = BillCameraService()
+    @StateObject private var camera = SharedCameraService()
     @State private var capturedImage: UIImage?
     @State private var parsedResult: ParsedBillResult?
     @State private var isProcessing = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showCameraError = false
 
     var body: some View {
         ZStack {
-            BillCameraPreview(session: camera.session)
+            SharedCameraPreview(session: camera.session)
                 .ignoresSafeArea()
 
             VStack {
@@ -47,47 +47,52 @@ struct BillUploadView: View {
 
                 // Buttons
                 if !isProcessing && parsedResult == nil {
-                    HStack {
+                    VStack(spacing: 16) {
                         Button(action: { dismiss() }) {
                             Text("Cancel")
                                 .foregroundStyle(Color.manor.onPrimary)
                                 .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, 8)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Spacer()
-
-                        Button(action: captureAndParse) {
-                            Circle()
-                                .fill(Color.manor.onPrimary)
-                                .frame(width: 72, height: 72)
-                                .overlay(
-                                    Circle()
-                                        .stroke(.white.opacity(0.5), lineWidth: 3)
-                                        .frame(width: 80, height: 80)
-                                )
-                        }
-                        .accessibilityLabel("Capture photo")
-
-                        Spacer()
-
-                        // Photo library + manual options
-                        Menu {
+                        HStack(spacing: 16) {
                             PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                                Label("Photo Library", systemImage: "photo.on.rectangle")
+                                VStack(spacing: 4) {
+                                    Image(systemName: "photo.on.rectangle")
+                                        .font(.title2)
+                                    Text("Library")
+                                        .font(.caption2)
+                                }
+                                .foregroundStyle(.white)
+                                .frame(width: 60)
                             }
+
+                            Button(action: captureAndParse) {
+                                Circle()
+                                    .fill(Color.manor.onPrimary)
+                                    .frame(width: 72, height: 72)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(.white.opacity(0.5), lineWidth: 3)
+                                            .frame(width: 80, height: 80)
+                                    )
+                            }
+                            .accessibilityLabel("Capture photo")
+
                             Button(action: {
                                 dismiss()
                                 onManual()
                             }) {
-                                Label("Enter Manually", systemImage: "pencil")
+                                VStack(spacing: 4) {
+                                    Image(systemName: "pencil")
+                                        .font(.title2)
+                                    Text("Manual")
+                                        .font(.caption2)
+                                }
+                                .foregroundStyle(.white)
+                                .frame(width: 60)
                             }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.title2)
-                                .foregroundStyle(.white.opacity(0.8))
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
                         }
                     }
                     .padding(.bottom, 40)
@@ -112,10 +117,26 @@ struct BillUploadView: View {
                 }
             }
         }
+        .onChange(of: camera.cameraUnavailable) { _, unavailable in
+            if unavailable {
+                showCameraError = true
+            }
+        }
         .alert("Error", isPresented: $showError) {
-            Button("OK") {}
+            Button("OK") { dismiss() }
         } message: {
             Text(errorMessage)
+        }
+        .alert("Camera Unavailable", isPresented: $showCameraError) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                dismiss()
+            }
+            Button("Cancel") { dismiss() }
+        } message: {
+            Text("Camera access is required. Please enable it in Settings, or enter details manually.")
         }
     }
 
@@ -212,63 +233,3 @@ struct BillUploadView: View {
     }
 }
 
-// MARK: - Camera Service
-
-@MainActor
-private class BillCameraService: NSObject, ObservableObject {
-    let session = AVCaptureSession()
-    private let output = AVCapturePhotoOutput()
-    private var completion: ((UIImage?) -> Void)?
-
-    func start() {
-        guard !session.isRunning else { return }
-        session.sessionPreset = .photo
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
-        if session.canAddInput(input) { session.addInput(input) }
-        if session.canAddOutput(output) { session.addOutput(output) }
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.startRunning()
-        }
-    }
-
-    func stop() {
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.stopRunning()
-        }
-    }
-
-    func capturePhoto(completion: @escaping (UIImage?) -> Void) {
-        self.completion = completion
-        output.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
-    }
-}
-
-extension BillCameraService: AVCapturePhotoCaptureDelegate {
-    nonisolated func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else {
-            Task { @MainActor in self.completion?(nil) }
-            return
-        }
-        Task { @MainActor in self.completion?(image) }
-    }
-}
-
-private struct BillCameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        let layer = AVCaptureVideoPreviewLayer(session: session)
-        layer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(layer)
-        return view
-    }
-    func updateUIView(_ uiView: UIView, context: Context) {
-        if let layer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            layer.frame = uiView.bounds
-        }
-    }
-}

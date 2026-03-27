@@ -23,6 +23,7 @@ struct DetailsView: View {
     @State private var showingResults = false
     @State private var savedRoom: Room?
     @State private var windowQuestionnaireIndex: WindowEditID?
+    @State private var sqFtError: String? = nil
 
     @StateObject private var locationDetector = ClimateZoneDetector()
 
@@ -100,8 +101,13 @@ struct DetailsView: View {
                 }
             }
             .onAppear {
-                locationDetector.detectClimateZoneViaGPS { zone in
-                    if let zone { climateZone = zone }
+                // Default to home's climate zone if available; fall back to GPS detection
+                if let homeZone = home?.climateZoneEnum {
+                    climateZone = homeZone
+                } else {
+                    locationDetector.detectClimateZoneViaGPS { zone in
+                        if let zone { climateZone = zone }
+                    }
                 }
             }
         }
@@ -113,6 +119,12 @@ struct DetailsView: View {
         Section("Room Info") {
             TextField("Room Name (e.g. Living Room)", text: $roomName)
 
+            if roomName.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text("Room name is required")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
             HStack {
                 Text("Floor Area")
                 Spacer()
@@ -122,6 +134,12 @@ struct DetailsView: View {
                     .frame(width: 80)
                 Text("sq ft")
                     .foregroundStyle(.secondary)
+            }
+
+            if let error = sqFtError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
 
             if scannedSqFt != nil {
@@ -236,16 +254,17 @@ struct DetailsView: View {
     // MARK: - Logic
 
     private var isFormValid: Bool {
-        guard let sqFt = Double(squareFootage), sqFt > 0 else { return false }
+        guard !roomName.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        guard let sqFt = Double(squareFootage), sqFt > 0, sqFt <= 10000 else { return false }
         return true
     }
 
     private func saveAndCalculate() {
-        guard savedRoom == nil else {
-            showingResults = true
+        guard let sqFt = Double(squareFootage), sqFt > 0, sqFt <= 10000 else {
+            sqFtError = "Please enter a valid square footage (1–10,000 sq ft)"
             return
         }
-        guard let sqFt = Double(squareFootage), sqFt > 0 else { return }
+        sqFtError = nil
 
         let breakdown = EnergyCalculator.calculate(
             squareFootage: sqFt,
@@ -255,8 +274,18 @@ struct DetailsView: View {
             windows: windows
         )
 
-        if let existingRoom {
-            // Update existing room in place (e.g. filling in a placeholder)
+        if let existing = savedRoom {
+            existing.name = roomName
+            existing.squareFootage = sqFt
+            existing.ceilingHeight = ceilingHeight.feet
+            existing.climateZone = climateZone.rawValue
+            existing.insulation = insulation.rawValue
+            existing.windows = windows
+            existing.calculatedBTU = breakdown.finalBTU
+            existing.calculatedTonnage = breakdown.tonnage
+            existing.scanWasUsed = scannedSqFt != nil
+            if let home { home.updatedAt = Date() }
+        } else if let existingRoom {
             existingRoom.name = roomName
             existingRoom.squareFootage = sqFt
             existingRoom.ceilingHeight = ceilingHeight.feet
@@ -288,6 +317,7 @@ struct DetailsView: View {
             modelContext.insert(room)
             savedRoom = room
         }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         showingResults = true
     }
 }

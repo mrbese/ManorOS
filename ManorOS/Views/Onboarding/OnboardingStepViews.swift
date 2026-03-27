@@ -539,6 +539,7 @@ struct CreateAccountStep: View {
 
 struct NotificationsStep: View {
     var onRequestPermission: () -> Void
+    @State private var didRequest = false
 
     var body: some View {
         VStack(spacing: 28) {
@@ -575,11 +576,26 @@ struct NotificationsStep: View {
                 .font(.caption)
                 .foregroundStyle(Color.manor.textTertiary)
 
+            Button {
+                guard !didRequest else { return }
+                didRequest = true
+                onRequestPermission()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "bell.badge.fill")
+                    Text("Enable Notifications")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .foregroundStyle(Color.manor.onPrimary)
+                .background(Color.manor.primary, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .padding(.horizontal, 24)
+            .accessibilityLabel("Enable notifications")
+
             Spacer()
             Spacer()
-        }
-        .onAppear {
-            onRequestPermission()
         }
     }
 

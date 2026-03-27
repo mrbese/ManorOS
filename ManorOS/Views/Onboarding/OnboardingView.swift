@@ -8,6 +8,7 @@ struct OnboardingView: View {
     @AppStorage("userName") private var storedUserName = ""
     @AppStorage("userEmail") private var storedUserEmail = ""
     @AppStorage("notificationsRequested") private var notificationsRequested = false
+    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @Environment(\.modelContext) private var modelContext
 
     @State private var currentStep = 0
@@ -162,7 +163,10 @@ struct OnboardingView: View {
         guard !notificationsRequested else { return }
         notificationsRequested = true
         Task {
-            _ = await NotificationPermissionService.requestPermission()
+            let granted = await NotificationPermissionService.requestPermission()
+            await MainActor.run {
+                notificationsEnabled = granted
+            }
         }
     }
 
@@ -262,6 +266,12 @@ struct OnboardingView: View {
         // Persist account info
         if !userName.isEmpty { storedUserName = userName }
         if !userEmail.isEmpty { storedUserEmail = userEmail }
+
+        AnalyticsService.track(.onboardingCompleted, properties: [
+            "hasAddress": (!trimmedAddress.isEmpty).description,
+            "roomsPlanned": String(roomCount),
+            "bedroomsPlanned": String(bedroomCount)
+        ])
 
         didFinish = true
         hasSeenOnboarding = true

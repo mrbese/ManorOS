@@ -213,6 +213,10 @@ struct ScanView: View {
                     .foregroundStyle(Color.manor.onPrimary)
             }
             .padding(.horizontal, 32)
+            Button(action: { showingManualEntry = true }) {
+                Text("Enter Manually")
+                    .foregroundStyle(Color.manor.primary)
+            }
         }
     }
 

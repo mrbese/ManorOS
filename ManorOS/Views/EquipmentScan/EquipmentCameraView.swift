@@ -1,5 +1,4 @@
 import SwiftUI
-@preconcurrency import AVFoundation
 import UIKit
 
 struct EquipmentCameraView: View {
@@ -7,13 +6,13 @@ struct EquipmentCameraView: View {
     let onCapture: (UIImage) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @StateObject private var camera = CameraService()
+    @StateObject private var camera = SharedCameraService()
     @State private var showError = false
     @State private var errorMessage = ""
 
     var body: some View {
         ZStack {
-            CameraPreviewView(session: camera.session)
+            SharedCameraPreview(session: camera.session)
                 .ignoresSafeArea()
 
             VStack {
@@ -93,88 +92,21 @@ struct EquipmentCameraView: View {
         .onDisappear { camera.stop() }
         .onChange(of: camera.cameraUnavailable) { _, unavailable in
             if unavailable {
-                errorMessage = "Camera is not available on this device."
+                errorMessage = "Camera access is required. Please enable it in Settings, or enter details manually."
                 showError = true
             }
         }
-        .alert("Camera Error", isPresented: $showError) {
-            Button("OK") {}
+        .alert("Camera Unavailable", isPresented: $showError) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                dismiss()
+            }
+            Button("Cancel") { dismiss() }
         } message: {
             Text(errorMessage)
         }
     }
 }
 
-// MARK: - Camera Service
-
-@MainActor
-private class CameraService: NSObject, ObservableObject {
-    let session = AVCaptureSession()
-    private let output = AVCapturePhotoOutput()
-    private var completion: ((UIImage?) -> Void)?
-
-    @Published var cameraUnavailable = false
-
-    func start() {
-        guard !session.isRunning else { return }
-        session.sessionPreset = .photo
-
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else {
-            cameraUnavailable = true
-            return
-        }
-
-        if session.canAddInput(input) { session.addInput(input) }
-        if session.canAddOutput(output) { session.addOutput(output) }
-
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.startRunning()
-        }
-    }
-
-    func stop() {
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.stopRunning()
-        }
-    }
-
-    func capturePhoto(completion: @escaping (UIImage?) -> Void) {
-        self.completion = completion
-        let settings = AVCapturePhotoSettings()
-        output.capturePhoto(with: settings, delegate: self)
-    }
-}
-
-extension CameraService: AVCapturePhotoCaptureDelegate {
-    nonisolated func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else {
-            Task { @MainActor in self.completion?(nil) }
-            return
-        }
-        Task { @MainActor in self.completion?(image) }
-    }
-}
-
-// MARK: - Camera Preview
-
-private struct CameraPreviewView: UIViewRepresentable {
-    let session: AVCaptureSession
-
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
-        return view
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            previewLayer.frame = uiView.bounds
-        }
-    }
-}

@@ -9,48 +9,72 @@ enum ReportPDFGenerator {
     private static let margin: CGFloat = 50
     private static let contentWidth: CGFloat = 612 - 100 // pageWidth - 2 * margin
 
-    @MainActor
-    static func generatePDF(for home: Home) -> Data? {
-        let text = buildReportText(for: home)
-        let format = UIGraphicsPDFRendererFormat()
-        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
-        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
-
-        let data = renderer.pdfData { context in
-            drawPages(context: context, text: text, pageRect: pageRect)
-        }
-
-        return data.isEmpty ? nil : data
+    struct BreakdownSnapshot: Sendable {
+        let name: String
+        let annualCost: Double
+        let percentage: Double
     }
 
-    @MainActor
-    static func savePDF(for home: Home) -> URL? {
-        guard let data = generatePDF(for: home) else { return nil }
-
-        let fileName = "\(home.name.isEmpty ? "Home" : home.name)_Report.pdf"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-
-        do {
-            try data.write(to: url)
-            return url
-        } catch {
-            return nil
-        }
+    struct UpgradeSnapshot: Sendable {
+        let equipmentLabel: String
+        let title: String
+        let savingsPerYear: Int
+        let costRange: String
+        let payback: String
+        let taxCredit: String?
     }
 
-    // MARK: - Text Building
+    struct Snapshot: Sendable {
+        let generatedAt: Date
+        let homeName: String
+        let address: String?
+        let climateZone: String
+        let totalSqFt: Int?
+        let roomsCount: Int
+        let equipmentCount: Int
+        let grade: String
+        let gradeSummary: String
+
+        let currentAnnualCost: Int?
+        let upgradedAnnualCost: Int?
+        let potentialSavings: Int?
+
+        let breakdown: [BreakdownSnapshot]
+        let billComparison: String?
+        let envelopeSummaryLines: [String]
+        let topConsumers: [String]
+        let upgrades: [UpgradeSnapshot]
+        let quickWins: [String]
+
+        let taxCredit25C: Int
+        let taxCredit25D: Int
+        let taxCreditTotal: Int
+    }
+
+    static func savePDFAsync(for home: Home) async -> URL? {
+        let snapshot = await MainActor.run { makeSnapshot(for: home) }
+        return await Task.detached(priority: .userInitiated) {
+            savePDF(from: snapshot)
+        }.value
+    }
+
+    // MARK: - Snapshot
 
     @MainActor
-    private static func buildReportText(for home: Home) -> NSAttributedString {
-        let result = NSMutableAttributedString()
-
+    private static func makeSnapshot(for home: Home) -> Snapshot {
         let grade = GradingEngine.grade(for: home)
         let profile = EnergyProfileService.generateProfile(for: home)
         let homeRecs = RecommendationEngine.generateHomeRecommendations(for: home)
         let sqFt = home.computedTotalSqFt > 0 ? home.computedTotalSqFt : 1500
 
         let allUpgradesByEquipment: [(equipment: Equipment, upgrades: [UpgradeRecommendation])] = home.equipment.compactMap { eq in
-            let ups = UpgradeEngine.generateUpgrades(for: eq, climateZone: home.climateZoneEnum, homeSqFt: sqFt)
+            let ups = UpgradeEngine.generateUpgrades(
+                for: eq,
+                climateZone: home.climateZoneEnum,
+                homeSqFt: sqFt,
+                electricityRate: home.actualElectricityRate,
+                gasRate: home.actualGasRate
+            )
             guard !ups.isEmpty else { return nil }
             let bestTier = ups.first(where: { $0.tier == .best })
             guard (bestTier?.annualSavings ?? 0) > 10 else { return nil }
@@ -61,130 +85,233 @@ enum ReportPDFGenerator {
             return aPB < bPB
         }
 
-        let totalCurrentCost = home.equipment.reduce(0) { sum, eq in
+        let totalCurrentCost: Double = home.equipment.reduce(0) { sum, eq in
             sum + EfficiencyDatabase.estimateAnnualCost(
-                type: eq.typeEnum, efficiency: eq.estimatedEfficiency,
-                homeSqFt: sqFt, climateZone: home.climateZoneEnum
+                type: eq.typeEnum,
+                efficiency: eq.estimatedEfficiency,
+                homeSqFt: sqFt,
+                climateZone: home.climateZoneEnum,
+                electricityRate: home.actualElectricityRate,
+                gasRate: home.actualGasRate
             )
         }
-        let totalUpgradedCost = home.equipment.reduce(0) { sum, eq in
+        let totalUpgradedCost: Double = home.equipment.reduce(0) { sum, eq in
             let spec = EfficiencyDatabase.lookup(type: eq.typeEnum, age: eq.ageRangeEnum)
             return sum + EfficiencyDatabase.estimateAnnualCost(
-                type: eq.typeEnum, efficiency: spec.bestInClass,
-                homeSqFt: sqFt, climateZone: home.climateZoneEnum
+                type: eq.typeEnum,
+                efficiency: spec.bestInClass,
+                homeSqFt: sqFt,
+                climateZone: home.climateZoneEnum,
+                electricityRate: home.actualElectricityRate,
+                gasRate: home.actualGasRate
             )
         }
         let totalSavings = max(totalCurrentCost - totalUpgradedCost, 0)
         let taxCredits = UpgradeEngine.aggregateTaxCredits(from: allUpgradesByEquipment.map(\.upgrades))
 
-        // Header
+        let billComparison = profile.billComparison.map {
+            "Actual (from bills): \(Int($0.billBasedAnnualKWh)) kWh/yr\nEstimated (from audit): \(Int($0.estimatedAnnualKWh)) kWh/yr\nAccuracy: \($0.accuracyLabel) (\(Int($0.gapPercentage))% gap)"
+        }
+
+        let envelopeLines: [String] = profile.envelopeScore?.details ?? []
+        let envelopeHeader: String? = profile.envelopeScore.map { "BUILDING ENVELOPE: \($0.grade) (\(Int($0.score))/100)" }
+
+        let upgrades: [UpgradeSnapshot] = allUpgradesByEquipment.compactMap { group in
+            guard let best = group.upgrades.first(where: { $0.tier == .best }) else { return nil }
+            let pb = best.paybackYears.map { String(format: "%.1f yr payback", $0) } ?? "N/A"
+            let credit = best.taxCreditEligible ? "$\(Int(best.taxCreditAmount))" : nil
+            return UpgradeSnapshot(
+                equipmentLabel: group.equipment.typeEnum.rawValue,
+                title: best.title,
+                savingsPerYear: Int(best.annualSavings),
+                costRange: "$\(Int(best.costLow))-$\(Int(best.costHigh))",
+                payback: pb,
+                taxCredit: credit
+            )
+        }
+
+        let topConsumers = profile.topConsumers.prefix(5).enumerated().map { idx, c in
+            "#\(idx + 1) \(c.name): $\(Int(c.annualCost))/yr"
+        }
+
+        let breakdown = profile.breakdown.map { BreakdownSnapshot(name: $0.name, annualCost: $0.annualCost, percentage: $0.percentage) }
+
+        let homeName = home.name.isEmpty ? "Unnamed Home" : home.name
+
+        let gradeValue = home.equipment.isEmpty ? "N/A" : grade.rawValue
+        let gradeSummary = home.equipment.isEmpty ? "Add equipment to get an efficiency grade." : grade.summary
+
+        return Snapshot(
+            generatedAt: Date(),
+            homeName: homeName,
+            address: (home.address?.isEmpty == false) ? home.address : nil,
+            climateZone: home.climateZoneEnum.rawValue,
+            totalSqFt: home.computedTotalSqFt > 0 ? Int(home.computedTotalSqFt) : nil,
+            roomsCount: home.rooms.count,
+            equipmentCount: home.equipment.count,
+            grade: gradeValue,
+            gradeSummary: gradeSummary,
+            currentAnnualCost: home.equipment.isEmpty ? nil : Int(totalCurrentCost),
+            upgradedAnnualCost: (home.equipment.isEmpty || totalSavings <= 0) ? nil : Int(totalUpgradedCost),
+            potentialSavings: (home.equipment.isEmpty || totalSavings <= 0) ? nil : Int(totalSavings),
+            breakdown: breakdown,
+            billComparison: billComparison,
+            envelopeSummaryLines: (envelopeHeader.map { [$0] } ?? []) + envelopeLines,
+            topConsumers: topConsumers,
+            upgrades: upgrades,
+            quickWins: homeRecs.map(\.title),
+            taxCredit25C: Int(taxCredits.total25C),
+            taxCredit25D: Int(taxCredits.total25D),
+            taxCreditTotal: Int(taxCredits.grandTotal)
+        )
+    }
+
+    // MARK: - Public sync API (legacy)
+
+    @MainActor
+    static func savePDF(for home: Home) -> URL? {
+        let snapshot = makeSnapshot(for: home)
+        return savePDF(from: snapshot)
+    }
+
+    // MARK: - Rendering
+
+    private static func savePDF(from snapshot: Snapshot) -> URL? {
+        guard let data = generatePDF(from: snapshot) else { return nil }
+        let fileName = "\(snapshot.homeName)_Report.pdf".replacingOccurrences(of: "/", with: "-")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        do {
+            try data.write(to: url)
+            return url
+        } catch {
+            return nil
+        }
+    }
+
+    private static func generatePDF(from snapshot: Snapshot) -> Data? {
+        let text = buildReportText(from: snapshot)
+        let format = UIGraphicsPDFRendererFormat()
+        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        let data = renderer.pdfData { context in
+            drawPages(context: context, text: text, pageRect: pageRect)
+        }
+        return data.isEmpty ? nil : data
+    }
+
+    // MARK: - Text Building
+
+    private static func buildReportText(from snapshot: Snapshot) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+
         result.append(styled("MANOR OS HOME ENERGY REPORT\n", style: .title))
         result.append(styled("\n", style: .body))
+        result.append(styled("Generated: ", style: .label))
+        result.append(styled("\(formattedDate(snapshot.generatedAt))\n\n", style: .body))
 
         // Summary
         result.append(styled("Home: ", style: .label))
-        result.append(styled("\(home.name.isEmpty ? "Unnamed Home" : home.name)\n", style: .body))
-        if let addr = home.address {
+        result.append(styled("\(snapshot.homeName)\n", style: .body))
+        if let addr = snapshot.address {
             result.append(styled("Address: ", style: .label))
             result.append(styled("\(addr)\n", style: .body))
         }
-        if home.computedTotalSqFt > 0 {
+        if let sq = snapshot.totalSqFt {
             result.append(styled("Total Area: ", style: .label))
-            result.append(styled("\(Int(home.computedTotalSqFt)) sq ft\n", style: .body))
+            result.append(styled("\(sq) sq ft\n", style: .body))
         }
         result.append(styled("Climate Zone: ", style: .label))
-        result.append(styled("\(home.climateZoneEnum.rawValue)\n", style: .body))
+        result.append(styled("\(snapshot.climateZone)\n", style: .body))
         result.append(styled("Rooms: ", style: .label))
-        result.append(styled("\(home.rooms.count)    ", style: .body))
+        result.append(styled("\(snapshot.roomsCount)    ", style: .body))
         result.append(styled("Equipment: ", style: .label))
-        result.append(styled("\(home.equipment.count)\n", style: .body))
+        result.append(styled("\(snapshot.equipmentCount)\n", style: .body))
         result.append(styled("Efficiency Grade: ", style: .label))
-        result.append(styled("\(grade.rawValue)\n", style: .gradeValue))
-        result.append(styled("\(grade.summary)\n\n", style: .caption))
+        result.append(styled("\(snapshot.grade)\n", style: .gradeValue))
+        result.append(styled("\(snapshot.gradeSummary)\n\n", style: .caption))
 
         // Energy Cost
-        if !home.equipment.isEmpty {
+        if let current = snapshot.currentAnnualCost {
             result.append(styled("ENERGY COST ESTIMATE\n", style: .heading))
-            result.append(styled("Current Annual Cost: $\(Int(totalCurrentCost))/yr\n", style: .body))
-            if totalSavings > 0 {
-                result.append(styled("After All Upgrades: $\(Int(totalUpgradedCost))/yr\n", style: .body))
-                result.append(styled("Potential Annual Savings: $\(Int(totalSavings))/yr\n", style: .highlight))
+            result.append(styled("Current Annual Cost: $\(current)/yr\n", style: .body))
+            if let upgraded = snapshot.upgradedAnnualCost, let savings = snapshot.potentialSavings {
+                result.append(styled("After All Upgrades: $\(upgraded)/yr\n", style: .body))
+                result.append(styled("Potential Annual Savings: $\(savings)/yr\n", style: .highlight))
             }
             result.append(styled("\n", style: .body))
         }
 
         // Energy Breakdown
-        let bp = profile.breakdown
-        if bp.count > 1 {
+        if snapshot.breakdown.count > 1 {
             result.append(styled("ENERGY BREAKDOWN\n", style: .heading))
-            for cat in bp {
+            for cat in snapshot.breakdown {
                 result.append(styled("  \(cat.name): $\(Int(cat.annualCost))/yr (\(Int(cat.percentage))%)\n", style: .body))
             }
             result.append(styled("\n", style: .body))
         }
 
         // Bill Comparison
-        if let comparison = profile.billComparison {
+        if let comparison = snapshot.billComparison {
             result.append(styled("BILL VS. ESTIMATE\n", style: .heading))
-            result.append(styled("Actual (from bills): \(Int(comparison.billBasedAnnualKWh)) kWh/yr\n", style: .body))
-            result.append(styled("Estimated (from audit): \(Int(comparison.estimatedAnnualKWh)) kWh/yr\n", style: .body))
-            result.append(styled("Accuracy: \(comparison.accuracyLabel) (\(Int(comparison.gapPercentage))% gap)\n\n", style: .body))
+            result.append(styled("\(comparison)\n\n", style: .body))
         }
 
         // Envelope
-        if let envScore = profile.envelopeScore {
-            result.append(styled("BUILDING ENVELOPE: \(envScore.grade) (\(Int(envScore.score))/100)\n", style: .heading))
-            for detail in envScore.details {
-                result.append(styled("  \(detail)\n", style: .body))
+        if !snapshot.envelopeSummaryLines.isEmpty {
+            result.append(styled(snapshot.envelopeSummaryLines[0] + "\n", style: .heading))
+            for line in snapshot.envelopeSummaryLines.dropFirst() {
+                result.append(styled("  \(line)\n", style: .body))
             }
             result.append(styled("\n", style: .body))
         }
 
-        // Appliance highlights
-        if !profile.topConsumers.isEmpty {
+        // Consumers
+        if !snapshot.topConsumers.isEmpty {
             result.append(styled("TOP ENERGY CONSUMERS\n", style: .heading))
-            for (i, consumer) in profile.topConsumers.enumerated() {
-                result.append(styled("  #\(i + 1) \(consumer.name): $\(Int(consumer.annualCost))/yr\n", style: .body))
+            for line in snapshot.topConsumers {
+                result.append(styled("  \(line)\n", style: .body))
             }
             result.append(styled("\n", style: .body))
         }
 
         // Upgrades
-        if !allUpgradesByEquipment.isEmpty {
+        if !snapshot.upgrades.isEmpty {
             result.append(styled("PRIORITIZED UPGRADES\n", style: .heading))
-            for item in allUpgradesByEquipment {
-                if let best = item.upgrades.first(where: { $0.tier == .best }) {
-                    let pb = best.paybackYears.map { String(format: "%.1f yr payback", $0) } ?? "N/A"
-                    let credit = best.taxCreditEligible ? " (tax credit: $\(Int(best.taxCreditAmount)))" : ""
-                    result.append(styled("  \(item.equipment.typeEnum.rawValue): \(best.title)\n", style: .label))
-                    result.append(styled("    $\(Int(best.annualSavings))/yr savings, $\(Int(best.costLow))-$\(Int(best.costHigh)) cost, \(pb)\(credit)\n", style: .body))
-                }
+            for up in snapshot.upgrades.prefix(8) {
+                let credit = up.taxCredit.map { " (tax credit: \($0))" } ?? ""
+                result.append(styled("  \(up.equipmentLabel): \(up.title)\n", style: .label))
+                result.append(styled("    $\(up.savingsPerYear)/yr savings, \(up.costRange) cost, \(up.payback)\(credit)\n", style: .body))
             }
             result.append(styled("\n", style: .body))
         }
 
         // Quick Wins
-        if !homeRecs.isEmpty {
+        if !snapshot.quickWins.isEmpty {
             result.append(styled("QUICK WINS & TIPS\n", style: .heading))
-            for rec in homeRecs {
-                let savings = rec.estimatedSavings.map { " (\($0))" } ?? ""
-                result.append(styled("  \(rec.title)\(savings)\n", style: .body))
+            for title in snapshot.quickWins.prefix(10) {
+                result.append(styled("  \(title)\n", style: .body))
             }
             result.append(styled("\n", style: .body))
         }
 
         // Tax Credits
-        if taxCredits.grandTotal > 0 {
+        if snapshot.taxCreditTotal > 0 {
             result.append(styled("TAX CREDITS\n", style: .heading))
-            if taxCredits.total25C > 0 { result.append(styled("  Section 25C: $\(Int(taxCredits.total25C))\n", style: .body)) }
-            if taxCredits.total25D > 0 { result.append(styled("  Section 25D: $\(Int(taxCredits.total25D))\n", style: .body)) }
-            result.append(styled("  Total Potential Credits: $\(Int(taxCredits.grandTotal))\n\n", style: .highlight))
+            if snapshot.taxCredit25C > 0 { result.append(styled("  Section 25C: $\(snapshot.taxCredit25C)\n", style: .body)) }
+            if snapshot.taxCredit25D > 0 { result.append(styled("  Section 25D: $\(snapshot.taxCredit25D)\n", style: .body)) }
+            result.append(styled("  Total Potential Credits: $\(snapshot.taxCreditTotal)\n\n", style: .highlight))
         }
 
         // Footer
         result.append(styled("\nGenerated by Manor OS | Built by Omer Bese\n", style: .caption))
-
         return result
+    }
+
+    private static func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     // MARK: - Drawing

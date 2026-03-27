@@ -1,21 +1,21 @@
 import SwiftUI
-@preconcurrency import AVFoundation
 import UIKit
 
 struct ApplianceScanView: View {
     let onClassified: (ClassificationResult, UIImage) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @StateObject private var camera = ApplianceCameraService()
+    @StateObject private var camera = SharedCameraService()
     @State private var capturedImage: UIImage?
     @State private var classificationResults: [ClassificationResult] = []
     @State private var isClassifying = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showCameraError = false
 
     var body: some View {
         ZStack {
-            CameraPreview(session: camera.session)
+            SharedCameraPreview(session: camera.session)
                 .ignoresSafeArea()
 
             VStack {
@@ -124,10 +124,30 @@ struct ApplianceScanView: View {
         }
         .onAppear { camera.start() }
         .onDisappear { camera.stop() }
-        .alert("Error", isPresented: $showError) {
-            Button("OK") {}
+        .onChange(of: camera.cameraUnavailable) { _, unavailable in
+            if unavailable {
+                showCameraError = true
+            }
+        }
+        .alert("Could not identify appliance", isPresented: $showError) {
+            Button("Try Again") {
+                capturedImage = nil
+                classificationResults = []
+            }
+            Button("Add Manually") { dismiss() }
         } message: {
-            Text(errorMessage)
+            Text("Try a different angle or add the appliance manually.")
+        }
+        .alert("Camera Unavailable", isPresented: $showCameraError) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+                dismiss()
+            }
+            Button("Cancel") { dismiss() }
+        } message: {
+            Text("Camera access is required. Please enable it in Settings, or enter details manually.")
         }
     }
 
@@ -159,71 +179,3 @@ struct ApplianceScanView: View {
     }
 }
 
-// MARK: - Camera Service (reusable pattern)
-
-@MainActor
-private class ApplianceCameraService: NSObject, ObservableObject {
-    let session = AVCaptureSession()
-    private let output = AVCapturePhotoOutput()
-    private var completion: ((UIImage?) -> Void)?
-
-    func start() {
-        guard !session.isRunning else { return }
-        session.sessionPreset = .photo
-
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else { return }
-
-        if session.canAddInput(input) { session.addInput(input) }
-        if session.canAddOutput(output) { session.addOutput(output) }
-
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.startRunning()
-        }
-    }
-
-    func stop() {
-        let session = session
-        DispatchQueue.global(qos: .userInitiated).async {
-            session.stopRunning()
-        }
-    }
-
-    func capturePhoto(completion: @escaping (UIImage?) -> Void) {
-        self.completion = completion
-        let settings = AVCapturePhotoSettings()
-        output.capturePhoto(with: settings, delegate: self)
-    }
-}
-
-extension ApplianceCameraService: AVCapturePhotoCaptureDelegate {
-    nonisolated func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        guard let data = photo.fileDataRepresentation(),
-              let image = UIImage(data: data) else {
-            Task { @MainActor in self.completion?(nil) }
-            return
-        }
-        Task { @MainActor in self.completion?(image) }
-    }
-}
-
-// MARK: - Camera Preview
-
-private struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
-
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-        previewLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(previewLayer)
-        return view
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        if let previewLayer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            previewLayer.frame = uiView.bounds
-        }
-    }
-}

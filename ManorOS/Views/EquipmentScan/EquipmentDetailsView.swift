@@ -8,6 +8,7 @@ struct EquipmentDetailsView: View {
 
     let home: Home
     var allowedTypes: [EquipmentType]? = nil
+    var existingEquipment: Equipment? = nil
     var onComplete: (() -> Void)? = nil
 
     @State private var equipmentType: EquipmentType = .centralAC
@@ -22,6 +23,9 @@ struct EquipmentDetailsView: View {
     @State private var showingResult = false
     @State private var savedEquipment: Equipment?
     @State private var isProcessingOCR = false
+    @State private var efficiencyError: String? = nil
+
+    private var isEditing: Bool { existingEquipment != nil }
 
     var body: some View {
         NavigationStack {
@@ -33,8 +37,9 @@ struct EquipmentDetailsView: View {
                 notesSection
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Add Equipment")
+            .navigationTitle(isEditing ? "Edit Equipment" : "Add Equipment")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { prefillFromExisting() }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -82,7 +87,7 @@ struct EquipmentDetailsView: View {
             .pickerStyle(.navigationLink)
         }
         .onAppear {
-            if let first = allowedTypes?.first, !allowedTypes!.contains(equipmentType) {
+            if let types = allowedTypes, let first = types.first, !types.contains(equipmentType) {
                 equipmentType = first
             }
         }
@@ -137,12 +142,19 @@ struct EquipmentDetailsView: View {
             TextField("Model Number (optional)", text: $modelNumber)
 
             HStack {
+                let spec = EfficiencyDatabase.lookup(type: equipmentType, age: ageRange)
                 Text("Efficiency (\(equipmentType.efficiencyUnit))")
                 Spacer()
-                TextField("auto", text: $manualEfficiency)
+                TextField("~\(String(format: "%.1f", spec.estimated))", text: $manualEfficiency)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
+            }
+
+            if let error = efficiencyError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
 
             if manualEfficiency.isEmpty {
@@ -151,6 +163,26 @@ struct EquipmentDetailsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            let explanation = efficiencyExplanation(for: equipmentType)
+            if !explanation.isEmpty {
+                Text(explanation)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func efficiencyExplanation(for type: EquipmentType) -> String {
+        switch type {
+        case .centralAC, .heatPump: return "SEER measures cooling efficiency. Higher is better. New systems are typically 14-22 SEER."
+        case .furnace: return "AFUE measures heating efficiency as a percentage. Higher is better. Modern furnaces are 90-98%."
+        case .waterHeater: return "UEF (Uniform Energy Factor) measures water heating efficiency. Higher is better."
+        case .waterHeaterTankless: return "UEF for tankless heaters. Higher is better. Typical range: 0.82-0.97."
+        case .windowUnit: return "EER measures cooling efficiency at a specific temperature. Higher is better."
+        case .windows: return "U-factor measures heat transfer. Lower is better (less heat loss)."
+        case .insulation: return "R-value measures thermal resistance. Higher is better (more insulation)."
+        default: return ""
         }
     }
 
@@ -169,6 +201,21 @@ struct EquipmentDetailsView: View {
         Section("Notes") {
             TextField("Any additional notes (optional)", text: $notes, axis: .vertical)
                 .lineLimit(3...6)
+        }
+    }
+
+    // MARK: - Prefill from Existing
+
+    private func prefillFromExisting() {
+        guard let eq = existingEquipment else { return }
+        equipmentType = eq.typeEnum
+        manufacturer = eq.manufacturer ?? ""
+        modelNumber = eq.modelNumber ?? ""
+        ageRange = eq.ageRangeEnum
+        manualEfficiency = String(format: "%.1f", eq.estimatedEfficiency)
+        notes = eq.notes ?? ""
+        if let data = eq.photoData {
+            capturedImage = UIImage(data: data)
         }
     }
 
@@ -192,33 +239,83 @@ struct EquipmentDetailsView: View {
         }
     }
 
+    // MARK: - Validation
+
+    private func efficiencyRange(for type: EquipmentType) -> ClosedRange<Double> {
+        switch type {
+        case .centralAC, .heatPump: return 8...30
+        case .furnace: return 50...100
+        case .waterHeater: return 0.3...4.0
+        case .waterHeaterTankless: return 0.5...1.0
+        case .windowUnit: return 5...15
+        case .windows: return 0.1...2.0
+        case .insulation: return 1...60
+        default: return 0.1...200
+        }
+    }
+
     // MARK: - Save
 
     private func saveEquipment() {
-        guard savedEquipment == nil else {
-            showingResult = true
-            return
+        if !manualEfficiency.isEmpty {
+            if let parsed = Double(manualEfficiency) {
+                let range = efficiencyRange(for: equipmentType)
+                if !range.contains(parsed) {
+                    efficiencyError = "Expected \(equipmentType.efficiencyUnit) between \(String(format: "%.1f", range.lowerBound)) and \(String(format: "%.1f", range.upperBound))"
+                    return
+                } else {
+                    efficiencyError = nil
+                }
+            } else {
+                efficiencyError = "Enter a valid number for efficiency"
+                return
+            }
+        } else {
+            efficiencyError = nil
         }
+
         let spec = EfficiencyDatabase.lookup(type: equipmentType, age: ageRange)
         let efficiency = Double(manualEfficiency) ?? spec.estimated
 
-        let eq = Equipment(
-            type: equipmentType,
-            manufacturer: manufacturer.isEmpty ? nil : manufacturer,
-            modelNumber: modelNumber.isEmpty ? nil : modelNumber,
-            ageRange: ageRange,
-            estimatedEfficiency: efficiency,
-            currentCodeMinimum: spec.codeMinimum,
-            bestInClass: spec.bestInClass,
-            photoData: capturedImage?.jpegData(compressionQuality: 0.7),
-            notes: notes.isEmpty ? nil : notes
-        )
-
-        eq.home = home
-        modelContext.insert(eq)
-        home.updatedAt = Date()
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        savedEquipment = eq
-        showingResult = true
+        if let existing = existingEquipment {
+            // Edit existing
+            existing.type = equipmentType.rawValue
+            existing.manufacturer = manufacturer.isEmpty ? nil : manufacturer
+            existing.modelNumber = modelNumber.isEmpty ? nil : modelNumber
+            existing.ageRange = ageRange.rawValue
+            existing.estimatedEfficiency = efficiency
+            existing.currentCodeMinimum = spec.codeMinimum
+            existing.bestInClass = spec.bestInClass
+            existing.notes = notes.isEmpty ? nil : notes
+            if let img = capturedImage {
+                existing.photoData = img.jpegData(compressionQuality: 0.7)
+            }
+            home.updatedAt = Date()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onComplete?()
+            dismiss()
+        } else {
+            guard savedEquipment == nil else {
+                showingResult = true
+                return
+            }
+            let eq = Equipment(
+                type: equipmentType,
+                manufacturer: manufacturer.isEmpty ? nil : manufacturer,
+                modelNumber: modelNumber.isEmpty ? nil : modelNumber,
+                ageRange: ageRange,
+                estimatedEfficiency: efficiency,
+                currentCodeMinimum: spec.codeMinimum,
+                bestInClass: spec.bestInClass,
+                photoData: capturedImage?.jpegData(compressionQuality: 0.7),
+                notes: notes.isEmpty ? nil : notes
+            )
+            eq.home = home
+            modelContext.insert(eq)
+            home.updatedAt = Date()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            savedEquipment = eq
+            showingResult = true
+        }
     }
 }

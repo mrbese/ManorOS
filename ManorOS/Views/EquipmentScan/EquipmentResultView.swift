@@ -15,7 +15,9 @@ struct EquipmentResultView: View {
         UpgradeEngine.generateUpgrades(
             for: equipment,
             climateZone: home.climateZoneEnum,
-            homeSqFt: home.computedTotalSqFt > 0 ? home.computedTotalSqFt : 1500
+            homeSqFt: home.computedTotalSqFt > 0 ? home.computedTotalSqFt : 1500,
+            electricityRate: home.actualElectricityRate,
+            gasRate: home.actualGasRate
         )
     }
 
@@ -89,6 +91,10 @@ struct EquipmentResultView: View {
 
     // MARK: - Comparison
 
+    private var isInvertedScale: Bool {
+        equipment.typeEnum == .windows
+    }
+
     private var efficiencyComparisonCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Efficiency Comparison")
@@ -115,6 +121,12 @@ struct EquipmentResultView: View {
                     }
                 }
                 .frame(height: 8)
+            }
+
+            if isInvertedScale {
+                Text("For U-factor, lower values indicate better insulation")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(16)
