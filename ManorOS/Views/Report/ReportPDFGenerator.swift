@@ -51,8 +51,9 @@ enum ReportPDFGenerator {
         let taxCreditTotal: Int
     }
 
+    @MainActor
     static func savePDFAsync(for home: Home) async -> URL? {
-        let snapshot = await MainActor.run { makeSnapshot(for: home) }
+        let snapshot = makeSnapshot(for: home)
         return await Task.detached(priority: .userInitiated) {
             savePDF(from: snapshot)
         }.value

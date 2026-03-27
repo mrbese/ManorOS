@@ -215,7 +215,7 @@ final class Appliance {
         self.category = category.rawValue
         self.name = name.isEmpty ? category.rawValue : name
         self.estimatedWattage = estimatedWattage ?? category.defaultWattage
-        self.hoursPerDay = hoursPerDay ?? category.defaultHoursPerDay
+        self.hoursPerDay = min(hoursPerDay ?? category.defaultHoursPerDay, 24.0)
         self.quantity = quantity
         self.detectionMethod = detectionMethod
         self.photoData = photoData

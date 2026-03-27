@@ -53,7 +53,7 @@ enum AuditStep: String, CaseIterable, Codable, Identifiable {
         case "Review":
             return AuditStep.review.rawValue
         default:
-            return AuditStep(rawValue: oldRaw)?.rawValue
+            return AuditStep(rawValue: oldRaw)?.rawValue ?? AuditStep.roomScanning.rawValue
         }
     }
 }

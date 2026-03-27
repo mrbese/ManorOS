@@ -12,9 +12,10 @@ final class SharedCameraService: NSObject, ObservableObject {
     @Published var cameraUnavailable = false
     private var isConfigured = false
 
-    nonisolated deinit {
-        Task { @MainActor in
-            self.stop()
+    deinit {
+        let session = session
+        DispatchQueue.global(qos: .userInitiated).async {
+            session.stopRunning()
         }
     }
 

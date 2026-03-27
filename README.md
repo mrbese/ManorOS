@@ -1,6 +1,6 @@
 # Manor OS
 
-**Open-source iOS home energy assessment tool. Scan rooms with LiDAR, photograph equipment for OCR efficiency analysis, get prioritized upgrade recommendations with payback periods and battery synergy insights. Built on ACCA Manual J and ASHRAE standards.**
+**Open-source iOS home energy assessment tool. Scan rooms with LiDAR, photograph equipment for OCR efficiency analysis, track appliances and utility bills, get prioritized upgrade recommendations with payback periods and battery synergy insights. Built on ACCA Manual J and ASHRAE standards.**
 
 [manoros.com](https://manoros.com)
 
@@ -8,25 +8,52 @@
 
 ## What It Does
 
-Manor OS turns your iPhone into a residential energy auditor. Walk through your home, scan each room with LiDAR, photograph your HVAC equipment labels, and get a comprehensive efficiency report with prioritized upgrades ranked by return on investment.
+Manor OS turns your iPhone into a residential energy auditor. Walk through your home, scan each room with LiDAR, photograph your HVAC equipment labels, log appliances and lighting, upload utility bills, and get a comprehensive efficiency report with prioritized upgrades ranked by return on investment.
+
+### Guided Audit Flow
+- 6-step guided audit: Rooms → Equipment → Appliances & Lighting → Building Envelope → Bills → Review
+- Progress bar tracks completion across all steps
+- Address autocomplete with automatic climate zone detection
 
 ### Room Scanning
 - Apple RoomPlan API detects floor area via LiDAR
-- Configure windows (count, direction, size), ceiling height, insulation quality
+- Configure windows (count, direction, size, pane type, frame material, condition)
+- Ceiling height and insulation quality assessment
 - ACCA Manual J simplified BTU load calculation
 - Manual input fallback for non-LiDAR devices
 
 ### Equipment Assessment
-- Photograph equipment rating plates (AC units, furnaces, water heaters, windows)
+- Photograph equipment rating plates (AC units, heat pumps, furnaces, water heaters, windows, thermostats, washers, dryers)
 - On-device OCR extracts model numbers and efficiency ratings via Apple Vision
 - Age-based efficiency estimation when labels are unreadable
 - Compares current efficiency against code minimums and best-in-class
 
+### Appliance & Lighting Tracking
+- Camera-based appliance scanning with category classification
+- Specialized lighting audit with OCR for bulb wattage detection
+- Tracks phantom/standby loads across 25+ appliance categories
+- Annual energy cost estimates per appliance
+
+### Energy Bill Upload
+- OCR-based utility bill scanning (kWh, cost, billing period)
+- Manual bill entry with date and usage
+- Computes actual electricity rates from uploaded bills
+- Compares bill-based usage vs. audit-based estimates
+
+### Building Envelope Assessment
+- Attic and wall insulation quality rating
+- Basement insulation status
+- Air sealing and weatherstripping condition
+- Scored envelope grade with improvement suggestions
+
 ### Home Energy Report
-- Overall efficiency grade (A through F)
-- Estimated annual energy costs
+- Overall efficiency grade (A through F) based on weighted criteria
+- Estimated annual energy costs with category breakdown
+- Top energy consumers ranked
 - Prioritized upgrade list sorted by payback period
+- Federal tax credit eligibility (Section 25C & 25D)
 - Battery synergy analysis: how much additional export capacity efficiency upgrades unlock for home battery systems (Pila Energy, Tesla Powerwall, Base Power, Enphase)
+- Exportable PDF report
 
 ---
 
@@ -42,7 +69,7 @@ This insight is based on ASHRAE standards, ACCA Manual J methodology, and field 
 
 ## BTU Calculation Methodology
 
-Based on ACCA Manual J simplified method.
+Based on ACCA Manual J simplified method. See [CALCULATIONS.md](CALCULATIONS.md) for the complete formula reference.
 
 | Parameter | Values |
 |---|---|
@@ -73,7 +100,7 @@ References: [ACCA Manual J](https://www.acca.org/bookstore/product/manual-j-resi
 - iPhone 12 Pro or later (LiDAR for room scanning)
 - Manual input mode works on all iPhones
 - iOS 17.0+
-- No external dependencies. Apple frameworks only (RoomPlan, ARKit, Vision, SwiftData, CoreLocation, AVFoundation)
+- No external dependencies. Apple frameworks only.
 - No network calls. Everything runs on-device.
 
 ---
@@ -88,41 +115,83 @@ Swift, SwiftUI, SwiftData, RoomPlan, ARKit, AVFoundation, Vision (OCR), CoreLoca
 
 ```
 ManorOS/
-  ManorOS/
-    App/
-      ManorOSApp.swift
-    Models/
-      Home.swift                    SwiftData model, contains rooms + equipment
-      Room.swift                    Room model, linked to Home
-      Equipment.swift               Equipment model with efficiency data
-      EquipmentType.swift           Enum: AC, heat pump, furnace, water heater, etc.
-      AgeRange.swift                Enum: 0-5, 5-10, 10-15, 15-20, 20+ years
-      WindowInfo.swift              Window direction + size
-      ClimateZone.swift             Hot / Moderate / Cold
-      InsulationQuality.swift       Poor / Average / Good
-    Views/
-      HomeListView.swift            List of homes
-      HomeDashboardView.swift       Single home overview
-      RoomScan/
-        ScanView.swift              RoomPlan capture flow
-        DetailsView.swift           Room configuration form
-        ResultsView.swift           BTU results + recommendations
-      EquipmentScan/
-        EquipmentCameraView.swift   Camera + OCR capture
-        EquipmentDetailsView.swift  Manual/OCR entry form
-        EquipmentResultView.swift   Single equipment analysis
-      Report/
-        HomeReportView.swift        Full home assessment report
-        ReportPDFGenerator.swift    PDF export
-    Services/
-      EnergyCalculator.swift        BTU calculation engine
-      RecommendationEngine.swift    Context-aware efficiency tips
-      RoomCaptureService.swift      RoomPlan + ARKit wrapper
-      EfficiencyDatabase.swift      Equipment lookup tables
-      GradingEngine.swift           A-F weighted efficiency grading
-      OCRService.swift              Apple Vision text recognition
-    Utils/
-      Constants.swift               Colors, calculation constants, rates
+  App/
+    ManorOSApp.swift              App entry point, SwiftData container setup
+    SchemaVersioning.swift        SwiftData schema version management
+  Models/
+    Home.swift                    Top-level model: rooms, equipment, appliances, bills
+    Room.swift                    Room with BTU calculations and window data
+    Equipment.swift               HVAC/water heater with efficiency tracking
+    Appliance.swift               Appliance model with energy + phantom load calculations
+    EnergyBill.swift              Utility bill with rate computation
+    AuditProgress.swift           Audit step tracking and migration
+    EquipmentType.swift           Enum: AC, heat pump, furnace, water heater, etc.
+    AgeRange.swift                Enum: 0-5, 5-10, 10-15, 15-20, 20+ years
+    WindowInfo.swift              Window properties with U-factor and heat gain
+    ClimateZone.swift             Hot / Moderate / Cold
+    InsulationQuality.swift       Poor / Average / Good
+  Views/
+    MainTabView.swift             Bottom tab bar (Home / Report / Settings)
+    HomeDashboardView.swift       Single home overview with audit progress
+    HomeListView.swift            Multi-home list
+    RoomScan/
+      ScanView.swift              RoomPlan LiDAR capture flow
+      DetailsView.swift           Room configuration form
+      ResultsView.swift           BTU results + recommendations
+    EquipmentScan/
+      EquipmentCameraView.swift   Camera + OCR capture
+      EquipmentDetailsView.swift  Manual/OCR entry form
+      EquipmentResultView.swift   Single equipment analysis
+    ApplianceScan/
+      ApplianceScanView.swift     Camera-based appliance scanning
+      ApplianceDetailsView.swift  Appliance entry form
+      ApplianceResultView.swift   Appliance energy analysis
+      LightingCloseupView.swift   Lighting OCR for bulb wattage
+    BillScan/
+      BillUploadView.swift        Bill photo/library upload with OCR
+      BillDetailsView.swift       Manual bill entry form
+      BillSummaryView.swift       Bill overview and rate analysis
+    AuditFlow/
+      AuditFlowView.swift         6-step guided audit coordinator
+      AuditProgressBar.swift      Visual progress indicator
+      EnvelopeAssessmentView.swift Building envelope questionnaire
+    WindowAssessment/
+      WindowQuestionnaireView.swift Window properties form
+    Onboarding/
+      OnboardingView.swift        6-step onboarding flow
+      OnboardingStepViews.swift   Individual step content
+      OnboardingCard.swift        Reusable onboarding card
+      OnboardingProgressBar.swift Progress indicator
+    Report/
+      HomeReportView.swift        Full home assessment report
+      ReportTabView.swift         Report navigation
+      ReportPDFGenerator.swift    PDF export with styled layout
+    Settings/
+      SettingsView.swift          Rates, notifications, data management
+  Services/
+    EnergyCalculator.swift        ACCA Manual J BTU calculation engine
+    EnergyProfileService.swift    Aggregates costs into energy breakdown
+    GradingEngine.swift           A-F weighted efficiency grading
+    EfficiencyDatabase.swift      Equipment lookup tables by type and age
+    RecommendationEngine.swift    Context-aware efficiency tips
+    UpgradeEngine.swift           Upgrade costs, savings, payback periods
+    RebateDatabase.swift          Federal + state rebate data (IRA, state programs)
+    RebateService.swift           Rebate eligibility filtering
+    RoomCaptureService.swift      RoomPlan + ARKit wrapper
+    OCRService.swift              Apple Vision text recognition for equipment
+    LightingOCRService.swift      Specialized OCR for light bulb specs
+    BillParsingService.swift      Utility bill OCR parser
+    ApplianceClassificationService.swift  Appliance category classification
+    SharedCameraService.swift     Shared camera session across scan views
+    AddressSearchService.swift    Geocoding + address autocomplete
+    StateDetectionService.swift   Location-based state detection
+    AppleSignInCoordinator.swift  Sign In with Apple handler
+    NotificationPermissionService.swift  iOS notification permissions
+    NotificationScheduler.swift   Engagement notification scheduling
+    AnalyticsService.swift        Debug event tracking
+  Utils/
+    Constants.swift               Calculation constants, default rates
+    ManorColors.swift             Centralized brand color system
 ```
 
 ---
