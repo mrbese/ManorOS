@@ -128,7 +128,7 @@ struct DetailsView: View {
             HStack {
                 Text("Floor Area")
                 Spacer()
-                TextField("sq ft", text: $squareFootage)
+                TextField("0", text: $squareFootage)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 80)
